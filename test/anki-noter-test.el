@@ -624,16 +624,29 @@ C
     (should-error (anki-noter--send "content" "prompt" #'ignore)
                   :type 'user-error)))
 
-;;;; anki-noter--read-options
+;;;; anki-noter--transient-value
 
-(ert-deftest anki-noter--read-options/defaults-without-prefix ()
-  "Without prefix arg, should return default template and card count."
-  (let ((anki-noter-default-template "programming")
-        (anki-noter-card-count 15))
-    (let ((opts (anki-noter--read-options nil)))
-      (should (equal "programming" (plist-get opts :template)))
-      (should (equal 15 (plist-get opts :card-count)))
-      (should-not (plist-get opts :topic)))))
+(ert-deftest anki-noter--transient-value/extracts-value ()
+  "Should extract the value portion after the key prefix."
+  (should (equal "MyDeck"
+                 (anki-noter--transient-value "--deck=" '("--deck=MyDeck" "--tags=t1")))))
+
+(ert-deftest anki-noter--transient-value/returns-nil-when-absent ()
+  "Should return nil when the key is not in the args list."
+  (should-not (anki-noter--transient-value "--deck=" '("--tags=t1" "--cite"))))
+
+(ert-deftest anki-noter--transient-value/handles-empty-args ()
+  "Should return nil for an empty args list."
+  (should-not (anki-noter--transient-value "--file=" nil)))
+
+(ert-deftest anki-noter--transient-value/handles-empty-value ()
+  "Should return empty string when key is present but value is empty."
+  (should (equal "" (anki-noter--transient-value "--count=" '("--count=")))))
+
+(ert-deftest anki-noter--transient-value/handles-value-with-equals ()
+  "Should handle values that themselves contain = signs."
+  (should (equal "a=b"
+                 (anki-noter--transient-value "--file=" '("--file=a=b")))))
 
 ;;;; anki-noter--maybe-push
 

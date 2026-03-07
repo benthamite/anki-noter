@@ -9,7 +9,8 @@ You provide source material (org files, markdown, text, PDFs, or web pages) and 
 ## Dependencies
 
 - **[gptel](https://github.com/karthink/gptel)** (>= 0.9) — LLM integration (request handling, backend selection, context management)
-- **[anki-editor](https://github.com/louietan/anki-editor)** (>= 0.3) — Anki synchronization (pushing notes to Anki via AnkiConnect)
+- **[anki-editor](https://github.com/louietan/anki-editor)** (>= 0.3) — Anki synchronization (pushing notes to Anki via AnkiConnect), deck and tag completion
+- **[transient](https://github.com/magit/transient)** — menu interface (bundled with Emacs 28.1+)
 - **Emacs** >= 28.1
 
 ## Installation
@@ -42,37 +43,58 @@ Clone the repository and add it to your `load-path`:
 
 ### Input methods
 
-- **Current buffer or active region**: generate cards from what's in the current buffer (or the selected region, if active)
-- **File path**: interactive command that prompts for a file path
-- **URL**: interactive command that prompts for a URL
+All input methods are configured through the transient menu (`M-x anki-noter`):
+
+- **Current buffer or active region** (default): if no file or URL is set, cards are generated from the current buffer content (or the selected region, if active)
+- **File** (`f`): set a file path as the source
+- **URL** (`u`): set a URL as the source
 
 When using current buffer/region, the content is sent to the LLM directly. When using a file path, the file is added via `gptel-context`. When using a URL, the page is fetched, cleaned, and sent as text.
 
 ### Long documents
 
-For documents that may exceed the LLM's context window, you can specify a page range or section. For PDFs, you are prompted for a page range (e.g. "1-20"). For text-based formats, select a region in the buffer.
+For documents that may exceed the LLM's context window, you can specify a page range or section. For PDFs, set a page range via `r` in the transient (e.g. "1-20"). For text-based formats, select a region in the buffer before opening the transient.
 
-## Commands
+## Usage
 
-### Primary commands
+Run `M-x anki-noter` to open the transient menu. The menu is organized into three groups:
 
-- `anki-noter-generate` — Generate cards from the current buffer or active region. Uses the default template. With `C-u`, prompts for template, card count, and topic focus.
-- `anki-noter-generate-from-file` — Prompt for a file path, generate cards from it.
-- `anki-noter-generate-from-url` — Prompt for a URL, fetch the page, generate cards.
+### Source
 
-### Supporting commands
+| Key | Parameter | Description |
+|-----|-----------|-------------|
+| `f` | File | Set a file path as the source |
+| `u` | URL | Set a URL as the source |
+| `r` | Page range | Restrict to a page range (e.g. "1-20") for PDFs |
 
-- `anki-noter-select-template` — Interactively select and set the default prompt template.
+If neither file nor URL is set, the current buffer content (or active region) is used.
 
-### Prefix argument options
+### Target
 
-When invoked with `C-u`, all primary commands prompt for:
+| Key | Parameter | Description |
+|-----|-----------|-------------|
+| `d` | Deck | Anki deck, with completion from Anki via anki-editor |
+| `t` | Tags | Anki tags, with `completing-read-multiple` from Anki via anki-editor |
 
-- **Template**: which prompt template to use
-- **Card count**: target number of cards (empty = LLM decides)
-- **Topic focus**: restrict card generation to a specific topic from the source material
+If deck or tags are not set in the transient, they fall back to org context inheritance (walking up the org tree for `ANKI_DECK` / `ANKI_TAGS` properties), then prompt interactively.
 
-You can also pass a numeric prefix argument (e.g. `C-u 10`) to set the card count directly.
+### Options
+
+| Key | Parameter | Description |
+|-----|-----------|-------------|
+| `T` | Template | Prompt template to use (default: `general`) |
+| `c` | Card count | Target number of cards (LLM decides if unset) |
+| `l` | Language | Output language (inherits source language if unset) |
+| `o` | Topic focus | Restrict card generation to a specific topic |
+| `s` | Cite sources | Toggle source citation on card backs |
+
+### Actions
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `g` | Generate | Generate cards with the current settings |
+
+The transient initializes its values from your defcustom settings and the current org context, so you only need to adjust what differs from your defaults.
 
 ## Card format
 
@@ -102,18 +124,22 @@ Key format rules:
 
 ### Deck and tags
 
-- **Inherited from org context**: anki-noter walks up the org tree looking for `ANKI_DECK` and `ANKI_TAGS` properties. If found, they are used.
-- **Prompted if missing**: if no deck or tags can be inherited, you are prompted interactively.
-- The LLM may also suggest additional tags based on content; these are appended to any inherited tags.
+Deck and tags are resolved in the following order:
+
+1. **Transient value**: if explicitly set via `d` (deck) or `t` (tags) in the transient menu, that value is used.
+2. **Org context inheritance**: anki-noter walks up the org tree looking for `ANKI_DECK` and `ANKI_TAGS` properties.
+3. **Interactive prompt**: if neither of the above yields a value, you are prompted interactively (with completion from Anki via anki-editor).
+
+The LLM may also suggest additional tags based on content; these are appended to any inherited tags.
 
 ### Source citation
 
-Each generated card includes a reference to its source:
+When `anki-noter-cite-sources` is non-nil (or the cite sources toggle `s` is enabled in the transient), each generated card includes a reference to its source:
 - For files: the file name and page range if applicable
 - For URLs: the URL
 - For buffer content: the buffer name
 
-The citation is appended to the card back as a separate paragraph.
+The citation is appended to the card back as a separate paragraph. By default, citation is off.
 
 ## Prompt templates
 
@@ -151,6 +177,7 @@ After inserting the generated cards, anki-noter prompts: "Push N new notes to An
 | `anki-noter-prompt-templates` | alist | (built-in) | Named prompt templates |
 | `anki-noter-language` | string or nil | `nil` | Output language (nil = same as source) |
 | `anki-noter-anki-format` | string or nil | `nil` | Value for `ANKI_FORMAT` property |
+| `anki-noter-cite-sources` | boolean | `nil` | If non-nil, append a source citation to each card back |
 | `anki-noter-cite-format` | string | `"Source: %s"` | Format string for source citation |
 | `anki-noter-pdf-fallback-command` | string | `"pdftotext %s -"` | Command for PDF text extraction when native PDF input is unavailable |
 | `anki-noter-auto-push` | boolean | `nil` | If non-nil, push to Anki automatically without prompting |

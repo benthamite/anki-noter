@@ -20,6 +20,8 @@
 
 (require 'org)
 (require 'gptel)
+(require 'anki-editor)
+(require 'transient)
 (require 'anki-noter-prompts)
 
 ;;;; Customization
@@ -44,7 +46,7 @@ When nil, the LLM decides the appropriate number."
 (defcustom anki-noter-language nil
   "Output language for generated cards.
 When nil, cards are generated in the same language as the source."
-  :type '(choice (const :tag "Same as source" nil)
+  :type '(choice (const :tag "Inherit source" nil)
                  (string :tag "Language"))
   :group 'anki-noter)
 
@@ -52,6 +54,11 @@ When nil, cards are generated in the same language as the source."
   "Value for the ANKI_FORMAT property on generated cards."
   :type '(choice (const :tag "nil (org-mode format)" nil)
                  (string :tag "Format"))
+  :group 'anki-noter)
+
+(defcustom anki-noter-cite-sources nil
+  "If non-nil, append a source citation to each card back."
+  :type 'boolean
   :group 'anki-noter)
 
 (defcustom anki-noter-cite-format "Source: %s"
@@ -97,12 +104,14 @@ When nil, cards are generated in the same language as the source."
 (defun anki-noter--get-deck ()
   "Get the Anki deck, inheriting from org context or prompting."
   (or (anki-noter--inherit-property "ANKI_DECK")
-      (read-string "Anki deck: ")))
+      (completing-read "Anki deck: " (anki-editor-deck-names) nil t)))
 
 (defun anki-noter--get-tags ()
   "Get Anki tags, inheriting from org context or prompting."
   (or (anki-noter--inherit-property "ANKI_TAGS")
-      (read-string "Anki tags (space-separated): ")))
+      (mapconcat #'identity
+                 (completing-read-multiple "Anki tags (comma-separated): " (anki-editor-all-tags))
+                 " ")))
 
 ;;;; Existing cards (incremental generation)
 
@@ -299,123 +308,197 @@ gptel-context instead of sending content directly."
       (org-end-of-subtree t)
       (set-marker anki-noter--insertion-marker (point)))))
 
-(defun anki-noter--read-options (arg)
-  "Read generation options when ARG is non-nil.
-Return a plist with :template, :card-count, :topic."
-  (if arg
-      (let ((template (completing-read "Template: "
-                                       (mapcar #'car anki-noter-prompt-templates)
-                                       nil t nil nil anki-noter-default-template))
-            (count (let ((input (read-string "Card count (empty = LLM decides): ")))
-                     (if (string-empty-p input) nil (string-to-number input))))
-            (topic (let ((input (read-string "Topic focus (empty = none): ")))
-                     (if (string-empty-p input) nil input))))
-        (list :template template :card-count count :topic topic))
-    (list :template anki-noter-default-template
-          :card-count anki-noter-card-count
-          :topic nil)))
+;;;; Transient
 
-;;;; Interactive commands
+(defclass anki-noter--prefix (transient-prefix) ())
+
+(cl-defmethod transient-init-value ((obj anki-noter--prefix))
+  "Initialize transient values from defcustoms and org context."
+  (oset obj value
+        (delq nil
+              (list
+               (concat "--template=" (or anki-noter-default-template "general"))
+               (when anki-noter-card-count
+                 (concat "--count=" (number-to-string anki-noter-card-count)))
+               (when anki-noter-language
+                 (concat "--language=" anki-noter-language))
+               (when anki-noter-cite-sources
+                 "--cite")
+               (when (derived-mode-p 'org-mode)
+                 (when-let ((deck (anki-noter--inherit-property "ANKI_DECK")))
+                   (concat "--deck=" deck)))
+               (when (derived-mode-p 'org-mode)
+                 (when-let ((tags (anki-noter--inherit-property "ANKI_TAGS")))
+                   (concat "--tags=" tags)))))))
+
+(defun anki-noter--transient-value (key args)
+  "Extract the value of KEY from transient ARGS."
+  (when-let ((arg (seq-find (lambda (a) (string-prefix-p key a)) args)))
+    (substring arg (length key))))
+
+(transient-define-infix anki-noter--infix-file ()
+  :class 'transient-option
+  :description "File"
+  :key "f"
+  :argument "--file="
+  :reader (lambda (prompt _initial-input _history)
+            (read-file-name prompt)))
+
+(transient-define-infix anki-noter--infix-url ()
+  :class 'transient-option
+  :description "URL"
+  :key "u"
+  :argument "--url="
+  :reader (lambda (prompt _initial-input _history)
+            (read-string prompt)))
+
+(transient-define-infix anki-noter--infix-range ()
+  :class 'transient-option
+  :description "Page range"
+  :key "r"
+  :argument "--range="
+  :reader (lambda (prompt _initial-input _history)
+            (read-string prompt)))
+
+(transient-define-infix anki-noter--infix-deck ()
+  :class 'transient-option
+  :description "Deck"
+  :key "d"
+  :argument "--deck="
+  :reader (lambda (prompt _initial-input _history)
+            (completing-read prompt (anki-editor-deck-names) nil t)))
+
+(transient-define-infix anki-noter--infix-tags ()
+  :class 'transient-option
+  :description "Tags"
+  :key "t"
+  :argument "--tags="
+  :reader (lambda (prompt _initial-input _history)
+            (mapconcat #'identity
+                       (completing-read-multiple prompt (anki-editor-all-tags))
+                       " ")))
+
+(transient-define-infix anki-noter--infix-template ()
+  :class 'transient-option
+  :description "Template"
+  :key "T"
+  :argument "--template="
+  :reader (lambda (prompt _initial-input _history)
+            (completing-read prompt
+                             (mapcar #'car anki-noter-prompt-templates)
+                             nil t nil nil anki-noter-default-template)))
+
+(transient-define-infix anki-noter--infix-count ()
+  :class 'transient-option
+  :description "Card count (LLM decides if unset)"
+  :key "c"
+  :argument "--count="
+  :reader (lambda (prompt _initial-input _history)
+            (read-string prompt)))
+
+(transient-define-infix anki-noter--infix-language ()
+  :class 'transient-option
+  :description "Language (inherit source if unset)"
+  :key "l"
+  :argument "--language="
+  :reader (lambda (prompt _initial-input _history)
+            (read-string prompt)))
+
+(transient-define-infix anki-noter--infix-topic ()
+  :class 'transient-option
+  :description "Topic focus"
+  :key "o"
+  :argument "--topic="
+  :reader (lambda (prompt _initial-input _history)
+            (read-string prompt)))
+
+(transient-define-infix anki-noter--infix-cite ()
+  :class 'transient-switch
+  :description "Cite sources"
+  :key "s"
+  :argument "--cite")
 
 ;;;###autoload
-(defun anki-noter-generate (arg)
-  "Generate Anki cards from the current buffer or active region.
-With prefix ARG, prompt for template, card count, and topic focus."
-  (interactive "P")
-  (anki-noter--prepare-insertion-point)
-  (let* ((options (anki-noter--read-options arg))
-         (card-count (or (plist-get options :card-count)
-                         anki-noter-card-count))
-         (deck (anki-noter--get-deck))
-         (tags (anki-noter--get-tags))
-         (existing (anki-noter--existing-card-fronts))
-         (cite (anki-noter--cite-buffer))
-         (content (anki-noter--buffer-content))
-         (system-prompt (anki-noter-prompts-build
-                         (plist-get options :template)
-                         deck tags
-                         :card-count card-count
-                         :language anki-noter-language
-                         :cite-source cite
-                         :existing-cards existing
-                         :topic (plist-get options :topic))))
-    (message "Generating Anki cards...")
-    (anki-noter--send content system-prompt #'anki-noter--insert-cards)))
+(transient-define-prefix anki-noter ()
+  "Generate Anki flashcards from source material via LLM."
+  :class 'anki-noter--prefix
+  ["Source"
+   (anki-noter--infix-file)
+   (anki-noter--infix-url)
+   (anki-noter--infix-range)]
+  ["Target"
+   (anki-noter--infix-deck)
+   (anki-noter--infix-tags)]
+  ["Options"
+   (anki-noter--infix-template)
+   (anki-noter--infix-count)
+   (anki-noter--infix-language)
+   (anki-noter--infix-topic)
+   (anki-noter--infix-cite)]
+  ["Actions"
+   ("g" "Generate" anki-noter-generate)])
 
-;;;###autoload
-(defun anki-noter-generate-from-file (file arg)
-  "Generate Anki cards from FILE.
-With prefix ARG, prompt for template, card count, and topic focus."
-  (interactive "fFile: \nP")
+(defun anki-noter-generate (&optional args)
+  "Generate Anki cards using the current transient settings.
+ARGS is the list of transient arguments."
+  (interactive (list (transient-args 'anki-noter)))
   (anki-noter--prepare-insertion-point)
-  (let* ((options (anki-noter--read-options arg))
-         (card-count (or (plist-get options :card-count) anki-noter-card-count))
-         (deck (anki-noter--get-deck))
-         (tags (anki-noter--get-tags))
+  (let* ((file (anki-noter--transient-value "--file=" args))
+         (url (anki-noter--transient-value "--url=" args))
+         (range (anki-noter--transient-value "--range=" args))
+         (deck (or (anki-noter--transient-value "--deck=" args)
+                   (anki-noter--get-deck)))
+         (tags (or (anki-noter--transient-value "--tags=" args)
+                   (anki-noter--get-tags)))
+         (template (or (anki-noter--transient-value "--template=" args)
+                       anki-noter-default-template))
+         (count-str (anki-noter--transient-value "--count=" args))
+         (card-count (if (and count-str (not (string-empty-p count-str)))
+                         (string-to-number count-str)
+                       anki-noter-card-count))
+         (language (or (anki-noter--transient-value "--language=" args)
+                       anki-noter-language))
+         (topic (anki-noter--transient-value "--topic=" args))
+         (cite-p (or (member "--cite" args) anki-noter-cite-sources))
          (existing (anki-noter--existing-card-fronts))
-         (ext (downcase (or (file-name-extension file) "")))
-         (is-pdf (string= ext "pdf"))
-         (page-range (when is-pdf
-                       (let ((input (read-string "Page range (e.g. 1-20, empty = all): ")))
-                         (unless (string-empty-p input) input))))
-         (cite (anki-noter--cite-file file page-range))
+         (cite (cond
+                ((and cite-p file) (anki-noter--cite-file file range))
+                ((and cite-p url) (anki-noter--cite-url url))
+                (cite-p (anki-noter--cite-buffer))))
          (system-prompt (anki-noter-prompts-build
-                         (plist-get options :template)
-                         deck tags
+                         template deck tags
                          :card-count card-count
-                         :language anki-noter-language
+                         :language language
                          :cite-source cite
                          :existing-cards existing
-                         :topic (plist-get options :topic))))
-    (message "Generating Anki cards from %s..." (file-name-nondirectory file))
+                         :topic topic)))
     (cond
-     ;; PDF with native support
-     ((and is-pdf (anki-noter--pdf-native-p))
-      (anki-noter--send nil system-prompt #'anki-noter--insert-cards file))
-     ;; PDF without native support — extract text
-     (is-pdf
-      (let ((text (anki-noter--extract-pdf-text file)))
-        (anki-noter--send text system-prompt #'anki-noter--insert-cards)))
-     ;; Text-based file — add to gptel-context
+     ;; File source
+     (file
+      (let* ((ext (downcase (or (file-name-extension file) "")))
+             (is-pdf (string= ext "pdf")))
+        (message "Generating Anki cards from %s..." (file-name-nondirectory file))
+        (cond
+         ((and is-pdf (anki-noter--pdf-native-p))
+          (anki-noter--send nil system-prompt #'anki-noter--insert-cards file))
+         (is-pdf
+          (let ((text (anki-noter--extract-pdf-text file)))
+            (anki-noter--send text system-prompt #'anki-noter--insert-cards)))
+         (t
+          (anki-noter--send nil system-prompt #'anki-noter--insert-cards file)))))
+     ;; URL source
+     (url
+      (message "Fetching %s..." url)
+      (anki-noter--fetch-url
+       url
+       (lambda (text)
+         (message "Generating Anki cards from URL...")
+         (anki-noter--send text system-prompt #'anki-noter--insert-cards))))
+     ;; Buffer/region source
      (t
-      (anki-noter--send nil system-prompt #'anki-noter--insert-cards file)))))
-
-;;;###autoload
-(defun anki-noter-generate-from-url (url arg)
-  "Generate Anki cards from URL.
-With prefix ARG, prompt for template, card count, and topic focus."
-  (interactive "sURL: \nP")
-  (anki-noter--prepare-insertion-point)
-  (let* ((options (anki-noter--read-options arg))
-         (card-count (or (plist-get options :card-count) anki-noter-card-count))
-         (deck (anki-noter--get-deck))
-         (tags (anki-noter--get-tags))
-         (existing (anki-noter--existing-card-fronts))
-         (cite (anki-noter--cite-url url))
-         (system-prompt (anki-noter-prompts-build
-                         (plist-get options :template)
-                         deck tags
-                         :card-count card-count
-                         :language anki-noter-language
-                         :cite-source cite
-                         :existing-cards existing
-                         :topic (plist-get options :topic))))
-    (message "Fetching %s..." url)
-    (anki-noter--fetch-url
-     url
-     (lambda (text)
-       (message "Generating Anki cards from URL...")
-       (anki-noter--send text system-prompt #'anki-noter--insert-cards)))))
-
-;;;###autoload
-(defun anki-noter-select-template ()
-  "Interactively select a prompt template."
-  (interactive)
-  (let ((name (completing-read "Template: "
-                               (mapcar #'car anki-noter-prompt-templates)
-                               nil t nil nil anki-noter-default-template)))
-    (setq anki-noter-default-template name)
-    (message "Template set to: %s" name)))
+      (message "Generating Anki cards from buffer...")
+      (anki-noter--send (anki-noter--buffer-content) system-prompt
+                        #'anki-noter--insert-cards)))))
 
 (provide 'anki-noter)
 ;;; anki-noter.el ends here

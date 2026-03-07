@@ -5,8 +5,10 @@ GPTEL_DIR ?= $(HOME)/.emacs.d/elpaca/builds/gptel
 ANKI_EDITOR_DIR ?= $(HOME)/.emacs.d/elpaca/builds/anki-editor
 COMPAT_DIR ?= $(HOME)/.emacs.d/elpaca/builds/compat
 TRANSIENT_DIR ?= $(HOME)/.emacs.d/elpaca/builds/transient
+COND_LET_DIR ?= $(HOME)/.emacs.d/elpaca/builds/cond-let
+SEQ_DIR ?= $(HOME)/.emacs.d/elpaca/builds/seq
 
-LOAD_PATH = -L . -L test -L $(GPTEL_DIR) -L $(ANKI_EDITOR_DIR) -L $(COMPAT_DIR) -L $(TRANSIENT_DIR)
+LOAD_PATH = -L . -L test -L $(GPTEL_DIR) -L $(ANKI_EDITOR_DIR) -L $(COMPAT_DIR) -L $(TRANSIENT_DIR) -L $(COND_LET_DIR) -L $(SEQ_DIR)
 
 .PHONY: test compile clean
 
