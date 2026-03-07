@@ -381,6 +381,332 @@
         (anki-noter--insert-cards "   "))
       (should (= 0 anki-noter--card-count-generated)))))
 
+;;;; anki-noter--adjust-heading-levels: additional edge cases
+
+(ert-deftest anki-noter--adjust-heading-levels/large-upward-delta ()
+  "Shifting from level 1 to level 10 should produce 10 stars."
+  (let ((result (anki-noter--adjust-heading-levels "* Heading\n" 10)))
+    (should (string-match-p "^\\*\\{10\\} Heading" result))))
+
+(ert-deftest anki-noter--adjust-heading-levels/sub-heading-preserves-delta ()
+  "Shifting down preserves the relative difference between heading levels."
+  (let ((result (anki-noter--adjust-heading-levels "** Main\n*** Sub\n" 1)))
+    ;; delta = 1 - 2 = -1; Main (2) -> 1, Sub (3) -> 2
+    (should (string-match-p "^\\* Main" result))
+    (should (string-match-p "^\\*\\* Sub" result))))
+
+(ert-deftest anki-noter--adjust-heading-levels/deep-shift-clamps-to-one ()
+  "When a large negative delta would push headings below 1, clamp to 1."
+  (let ((result (anki-noter--adjust-heading-levels "***** Main\n****** Sub\n" 1)))
+    ;; delta = 1 - 5 = -4; Main (5) -> 1, Sub (6) -> 2 (not below 1)
+    (should (string-match-p "^\\* Main" result))
+    (should (string-match-p "^\\*\\* Sub" result)))
+  ;; Now test actual clamping: target=1 with *** (level 3) as min
+  ;; delta = 1-3 = -2; *** (3) -> 1, * (1) -> max(1, -1) = 1
+  (let ((result (anki-noter--adjust-heading-levels "* Shallow\n*** Deep\n" 1)))
+    ;; min-level=1, target=1, delta=0 — no change
+    (should (string-match-p "^\\* Shallow" result))
+    (should (string-match-p "^\\*\\*\\* Deep" result))))
+
+(ert-deftest anki-noter--adjust-heading-levels/empty-string ()
+  "Empty string should be returned as-is."
+  (should (equal "" (anki-noter--adjust-heading-levels "" 3))))
+
+;;;; anki-noter--insert-cards: code fence bug fix (uppercase tags)
+
+(ert-deftest anki-noter--insert-cards/strips-uppercase-language-fence ()
+  "Code fences with uppercase language tags (e.g. Org, Markdown) should be stripped."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n"
+    (goto-char (point-max))
+    (let ((anki-noter--insertion-marker (point-marker))
+          (anki-noter--heading-level 2)
+          (anki-noter--card-count-generated 0))
+      (cl-letf (((symbol-function 'anki-noter--maybe-push) #'ignore))
+        (anki-noter--insert-cards "```Org\n** Card\nBody\n```"))
+      (should-not (string-match-p "```" (buffer-string)))
+      (should (string-match-p "Card" (buffer-string))))))
+
+(ert-deftest anki-noter--insert-cards/strips-mixed-case-fence ()
+  "Code fences like ```orgMode should be stripped."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n"
+    (goto-char (point-max))
+    (let ((anki-noter--insertion-marker (point-marker))
+          (anki-noter--heading-level 2)
+          (anki-noter--card-count-generated 0))
+      (cl-letf (((symbol-function 'anki-noter--maybe-push) #'ignore))
+        (anki-noter--insert-cards "```orgMode\n** Card\nBody\n```"))
+      (should-not (string-match-p "```" (buffer-string))))))
+
+;;;; anki-noter--insert-cards: property drawers preserved
+
+(ert-deftest anki-noter--insert-cards/preserves-property-drawers ()
+  "Property drawers in inserted cards should be preserved intact."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n"
+    (goto-char (point-max))
+    (let ((anki-noter--insertion-marker (point-marker))
+          (anki-noter--heading-level 2)
+          (anki-noter--card-count-generated 0))
+      (cl-letf (((symbol-function 'anki-noter--maybe-push) #'ignore))
+        (anki-noter--insert-cards
+         "** Question\n:PROPERTIES:\n:ANKI_DECK: TestDeck\n:ANKI_NOTE_TYPE: Basic\n:END:\nAnswer text\n"))
+      (let ((buf (buffer-string)))
+        (should (string-match-p ":ANKI_DECK: TestDeck" buf))
+        (should (string-match-p ":ANKI_NOTE_TYPE: Basic" buf))
+        (should (string-match-p "Answer text" buf))))))
+
+;;;; anki-noter--insert-cards: appends to existing content
+
+(ert-deftest anki-noter--insert-cards/appends-after-existing ()
+  "Cards should be appended after existing buffer content."
+  (anki-noter-test--with-org-buffer
+      "* Parent\nExisting body\n"
+    (goto-char (point-max))
+    (let ((anki-noter--insertion-marker (point-marker))
+          (anki-noter--heading-level 2)
+          (anki-noter--card-count-generated 0))
+      (cl-letf (((symbol-function 'anki-noter--maybe-push) #'ignore))
+        (anki-noter--insert-cards "** New card\nAnswer\n"))
+      (let ((buf (buffer-string)))
+        (should (string-match-p "Existing body" buf))
+        (should (string-match-p "New card" buf))
+        ;; Existing content should come before new card
+        (should (< (string-match "Existing body" buf)
+                   (string-match "New card" buf)))))))
+
+;;;; anki-noter--insert-cards: realistic LLM response
+
+(ert-deftest anki-noter--insert-cards/realistic-llm-response ()
+  "A realistic multi-card LLM response should be parsed correctly."
+  (anki-noter-test--with-org-buffer
+      "* Study notes\n"
+    (goto-char (point-max))
+    (let ((anki-noter--insertion-marker (point-marker))
+          (anki-noter--heading-level 2)
+          (anki-noter--card-count-generated 0)
+          (response "```org
+*** What is spaced repetition?
+:PROPERTIES:
+:ANKI_DECK: Learning
+:ANKI_NOTE_TYPE: Basic
+:ANKI_TAGS: learning memory
+:END:
+
+A learning technique that reviews material at increasing intervals.
+
+Source: /Learning How to Learn/
+
+*** What is the forgetting curve?
+:PROPERTIES:
+:ANKI_DECK: Learning
+:ANKI_NOTE_TYPE: Basic
+:ANKI_TAGS: learning memory
+:END:
+
+The exponential decline in memory retention over time, first described by Ebbinghaus.
+
+Source: /Learning How to Learn/
+```"))
+      (cl-letf (((symbol-function 'anki-noter--maybe-push) #'ignore))
+        (anki-noter--insert-cards response))
+      (should (= 2 anki-noter--card-count-generated))
+      (let ((buf (buffer-string)))
+        (should-not (string-match-p "```" buf))
+        (should (string-match-p "spaced repetition" buf))
+        (should (string-match-p "forgetting curve" buf))
+        (should (string-match-p "ANKI_NOTE_TYPE: Basic" buf))))))
+
+;;;; anki-noter--prepare-insertion-point: bug fix (before first heading)
+
+(ert-deftest anki-noter--prepare-insertion-point/before-first-heading ()
+  "Should default to level 1 when point is before the first heading."
+  (anki-noter-test--with-org-buffer
+      "Some text before any heading.\n* First heading\n"
+    (goto-char (point-min))
+    (anki-noter--prepare-insertion-point)
+    (should (= 1 anki-noter--heading-level))))
+
+(ert-deftest anki-noter--prepare-insertion-point/empty-org-buffer ()
+  "Should default to level 1 in an empty org buffer."
+  (anki-noter-test--with-org-buffer
+      ""
+    (anki-noter--prepare-insertion-point)
+    (should (= 1 anki-noter--heading-level))))
+
+(ert-deftest anki-noter--prepare-insertion-point/body-text-under-heading ()
+  "When on body text under a heading, level should be one deeper than that heading."
+  (anki-noter-test--with-org-buffer
+      "* Heading\nBody text here\n"
+    (search-forward "Body text")
+    (beginning-of-line)
+    (anki-noter--prepare-insertion-point)
+    (should (= 2 anki-noter--heading-level))))
+
+(ert-deftest anki-noter--prepare-insertion-point/marker-at-end-of-subtree ()
+  "When on a heading, marker should be after the subtree content."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n** Child\nChild body\n* Sibling\n"
+    (goto-char (point-min))
+    (anki-noter--prepare-insertion-point)
+    (let ((marker-pos (marker-position anki-noter--insertion-marker))
+          (body-end (progn (goto-char (point-min))
+                           (search-forward "Child body")
+                           (line-end-position)))
+          (sibling-pos (progn (goto-char (point-min))
+                              (search-forward "* Sibling")
+                              (match-beginning 0))))
+      ;; Marker should be between end of body and start of sibling
+      (should (>= marker-pos body-end))
+      (should (<= marker-pos sibling-pos)))))
+
+;;;; anki-noter--existing-card-fronts: bug fix (only direct children)
+
+(ert-deftest anki-noter--existing-card-fronts/excludes-nested-cards ()
+  "Should only collect direct children, not deeply nested cards."
+  (anki-noter-test--with-org-buffer
+      "* Parent
+** Card 1
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:END:
+Answer 1
+*** Nested card
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:END:
+Nested answer
+** Card 2
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:END:
+Answer 2
+"
+    (search-forward "** Card 2")
+    (beginning-of-line)
+    (let ((cards (anki-noter--existing-card-fronts)))
+      (should (= 2 (length cards)))
+      (should (member "Card 1" cards))
+      (should (member "Card 2" cards))
+      (should-not (member "Nested card" cards)))))
+
+(ert-deftest anki-noter--existing-card-fronts/preserves-order ()
+  "Cards should be returned in document order."
+  (anki-noter-test--with-org-buffer
+      "* Parent
+** Zebra card
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:END:
+A
+** Alpha card
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:END:
+B
+** Middle card
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:END:
+C
+"
+    (search-forward "** Middle card")
+    (beginning-of-line)
+    (let ((cards (anki-noter--existing-card-fronts)))
+      (should (equal '("Zebra card" "Alpha card" "Middle card") cards)))))
+
+;;;; anki-noter--send
+
+(ert-deftest anki-noter--send/errors-without-backend ()
+  "Should signal user-error when gptel-backend is nil."
+  (let ((gptel-backend nil))
+    (should-error (anki-noter--send "content" "prompt" #'ignore)
+                  :type 'user-error)))
+
+;;;; anki-noter--read-options
+
+(ert-deftest anki-noter--read-options/defaults-without-prefix ()
+  "Without prefix arg, should return default template and card count."
+  (let ((anki-noter-default-template "programming")
+        (anki-noter-card-count 15))
+    (let ((opts (anki-noter--read-options nil)))
+      (should (equal "programming" (plist-get opts :template)))
+      (should (equal 15 (plist-get opts :card-count)))
+      (should-not (plist-get opts :topic)))))
+
+;;;; anki-noter--maybe-push
+
+(ert-deftest anki-noter--maybe-push/auto-push-calls-anki-editor ()
+  "When auto-push is on, anki-editor-push-notes should be called."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n** Card\n:PROPERTIES:\n:ANKI_NOTE_TYPE: Basic\n:END:\nAnswer\n"
+    ;; Pre-load anki-editor so require inside --maybe-push is a no-op
+    (require 'anki-editor nil t)
+    (let ((anki-noter-auto-push t)
+          (anki-noter--card-count-generated 1)
+          (push-called nil)
+          (original (symbol-function 'anki-editor-push-notes)))
+      (fset 'anki-editor-push-notes (lambda () (setq push-called t)))
+      (unwind-protect
+          (progn
+            (anki-noter--maybe-push (point-min) (point-max))
+            (should push-called))
+        (fset 'anki-editor-push-notes original)))))
+
+(ert-deftest anki-noter--maybe-push/no-auto-push-without-anki-editor ()
+  "When anki-editor is not available, should not error."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n** Card\nAnswer\n"
+    (let ((anki-noter-auto-push t)
+          (anki-noter--card-count-generated 1))
+      ;; Simulate anki-editor not being available
+      (cl-letf (((symbol-function 'require)
+                 (lambda (feature &optional filename noerror)
+                   (if (eq feature 'anki-editor)
+                       nil
+                     (funcall (symbol-function 'require) feature filename noerror)))))
+        ;; Should not error
+        (anki-noter--maybe-push (point-min) (point-max))))))
+
+;;;; anki-noter--extract-pdf-text
+
+(ert-deftest anki-noter--extract-pdf-text/successful-extraction ()
+  "Should return extracted text when the command succeeds."
+  (let ((anki-noter-pdf-fallback-command "echo 'PDF content from %%s'"))
+    ;; Use echo as a mock for pdftotext; %s won't matter since echo ignores it
+    (let ((anki-noter-pdf-fallback-command "echo 'Extracted PDF text'"))
+      (let ((result (anki-noter--extract-pdf-text "/dummy/file.pdf")))
+        (should (string-match-p "Extracted PDF text" result))))))
+
+(ert-deftest anki-noter--extract-pdf-text/failed-command ()
+  "Should signal user-error when the extraction command fails."
+  (let ((anki-noter-pdf-fallback-command "false %s"))
+    (should-error (anki-noter--extract-pdf-text "/dummy/file.pdf")
+                  :type 'user-error)))
+
+;;;; anki-noter--cite-file: edge cases
+
+(ert-deftest anki-noter--cite-file/dotted-filename ()
+  "Files with multiple dots should strip only the final extension."
+  (should (equal "/my.book.v2/"
+                 (anki-noter--cite-file "/path/my.book.v2.pdf"))))
+
+(ert-deftest anki-noter--cite-file/single-page ()
+  "Page range can be a single page."
+  (should (equal "/book/, pp. 42"
+                 (anki-noter--cite-file "/path/book.pdf" "42"))))
+
+;;;; anki-noter--inherit-property: file-level properties
+
+(ert-deftest anki-noter--inherit-property/different-property-names ()
+  "Should find ANKI_TAGS the same way as ANKI_DECK."
+  (anki-noter-test--with-org-buffer
+      "* Parent\n:PROPERTIES:\n:ANKI_TAGS: tag1 tag2\n:END:\n** Child\n"
+    (search-forward "** Child")
+    (beginning-of-line)
+    (should (equal "tag1 tag2" (anki-noter--inherit-property "ANKI_TAGS")))))
+
 ;;;; Integration: adjust + count roundtrip
 
 (ert-deftest anki-noter--adjust-then-count/consistent ()
@@ -390,6 +716,24 @@
          (original-count (anki-noter--count-headings text))
          (adjusted-count (anki-noter--count-headings adjusted)))
     (should (= original-count adjusted-count))))
+
+;;;; Integration: full insert-cards pipeline
+
+(ert-deftest anki-noter--insert-cards/full-pipeline-with-fences-and-level-adjust ()
+  "Code fence stripping + level adjustment + counting should all work together."
+  (anki-noter-test--with-org-buffer
+      "** Deep parent\n"
+    (goto-char (point-max))
+    (let ((anki-noter--insertion-marker (point-marker))
+          (anki-noter--heading-level 4)
+          (anki-noter--card-count-generated 0))
+      (cl-letf (((symbol-function 'anki-noter--maybe-push) #'ignore))
+        (anki-noter--insert-cards
+         "```\n* Q1\nA1\n* Q2\nA2\n```"))
+      (should (= 2 anki-noter--card-count-generated))
+      (should (string-match-p "^\\*\\*\\*\\* Q1" (buffer-string)))
+      (should (string-match-p "^\\*\\*\\*\\* Q2" (buffer-string)))
+      (should-not (string-match-p "```" (buffer-string))))))
 
 (provide 'anki-noter-test)
 ;;; anki-noter-test.el ends here

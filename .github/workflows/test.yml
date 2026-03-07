@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emacs-version: ['28.2', '29.4', '30.1']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs-version }}
+
+      - name: Install dependencies
+        run: |
+          git clone --depth 1 https://github.com/karthink/gptel.git /tmp/gptel
+          git clone --depth 1 https://github.com/anki-editor/anki-editor.git /tmp/anki-editor
+          git clone --depth 1 https://github.com/emacs-compat/compat.git /tmp/compat
+          git clone --depth 1 https://github.com/magit/transient.git /tmp/transient
+
+      - name: Run tests
+        run: |
+          emacs --batch \
+            -L . -L test \
+            -L /tmp/gptel \
+            -L /tmp/anki-editor \
+            -L /tmp/compat \
+            -L /tmp/transient/lisp \
+            --eval "(require 'ert)" \
+            --eval "(require 'cl-lib)" \
+            -l test/anki-noter-prompts-test.el \
+            -l test/anki-noter-test.el \
+            --eval "(ert-run-tests-batch-and-exit)"
+
+      - name: Byte-compile
+        run: |
+          emacs --batch \
+            -L . \
+            -L /tmp/gptel \
+            -L /tmp/anki-editor \
+            -L /tmp/compat \
+            -L /tmp/transient/lisp \
+            -f batch-byte-compile anki-noter-prompts.el anki-noter.el

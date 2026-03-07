@@ -154,5 +154,67 @@
     (should (string-match-p "ethics" result))
     (should (string-match-p "Existing card" result))))
 
+;;;; Section ordering
+
+(ert-deftest anki-noter-prompts-build/base-before-template ()
+  "Base prompt sections should appear before template instructions."
+  (let ((result (anki-noter-prompts-build "general" "Deck" "tags")))
+    (let ((base-pos (string-match "## Output format" result))
+          (template-pos (string-match "## Template instructions" result)))
+      (should base-pos)
+      (should template-pos)
+      (should (< base-pos template-pos)))))
+
+(ert-deftest anki-noter-prompts-build/quality-before-template ()
+  "Card quality guidelines should appear before template instructions."
+  (let ((result (anki-noter-prompts-build "general" "Deck" "tags")))
+    (let ((quality-pos (string-match "## Card quality" result))
+          (template-pos (string-match "## Template instructions" result)))
+      (should quality-pos)
+      (should template-pos)
+      (should (< quality-pos template-pos)))))
+
+;;;; Edge cases
+
+(ert-deftest anki-noter-prompts--base/empty-existing-cards-list ()
+  "An empty existing-cards list should not add the deduplication section."
+  (let ((result (anki-noter-prompts--base "Deck" "tags" nil nil nil '() nil)))
+    (should-not (string-match-p "Already generated cards" result))))
+
+(ert-deftest anki-noter-prompts--base/special-chars-in-deck ()
+  "Deck names with :: separators should appear verbatim in the prompt."
+  (let ((result (anki-noter-prompts--base "Main::Sub::Deep" "tags" nil nil nil nil nil)))
+    (should (string-match-p "Main::Sub::Deep" result))))
+
+(ert-deftest anki-noter-prompts--base/special-chars-in-tags ()
+  "Multiple space-separated tags should appear in the prompt."
+  (let ((result (anki-noter-prompts--base "Deck" "tag1 tag2 tag3" nil nil nil nil nil)))
+    (should (string-match-p "tag1 tag2 tag3" result))))
+
+(ert-deftest anki-noter-prompts--base/large-card-count ()
+  "A large card count should appear correctly."
+  (let ((result (anki-noter-prompts--base "Deck" "tags" 100 nil nil nil nil)))
+    (should (string-match-p "100" result))))
+
+(ert-deftest anki-noter-prompts--base/existing-cards-preserves-order ()
+  "Existing cards should appear in the order given."
+  (let ((result (anki-noter-prompts--base "Deck" "tags" nil nil nil
+                                          '("First card" "Second card" "Third card") nil)))
+    (let ((pos1 (string-match "First card" result))
+          (pos2 (string-match "Second card" result))
+          (pos3 (string-match "Third card" result)))
+      (should pos1)
+      (should pos2)
+      (should pos3)
+      (should (< pos1 pos2))
+      (should (< pos2 pos3)))))
+
+(ert-deftest anki-noter-prompts--base/format-rules-present ()
+  "Important format rules should always be in the prompt."
+  (let ((result (anki-noter-prompts--base "Deck" "tags" nil nil nil nil nil)))
+    (should (string-match-p "ANKI_NOTE_ID" result))
+    (should (string-match-p "Do NOT wrap output in a code block" result))
+    (should (string-match-p "three stars" result))))
+
 (provide 'anki-noter-prompts-test)
 ;;; anki-noter-prompts-test.el ends here
