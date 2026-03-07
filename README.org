@@ -1,4 +1,4 @@
-#+title: anki-noter: generate Anki flashcards from source material via LLM
+#+title: =anki-noter=: generate Anki flashcards from source material via LLM
 #+author: Pablo Stafforini
 #+email: pablo@stafforini.com
 #+language: en
