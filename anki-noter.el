@@ -107,13 +107,17 @@ When nil, cards are generated in the same language as the source."
 ;;;; Existing cards (incremental generation)
 
 (defun anki-noter--existing-card-fronts ()
-  "Collect front text of existing anki-editor sibling headings."
-  (let ((cards '()))
+  "Collect front text of existing anki-editor sibling headings.
+Only direct children of the parent heading are considered."
+  (let ((cards '())
+        (child-level nil))
     (save-excursion
       (when (org-up-heading-safe)
+        (setq child-level (1+ (org-outline-level)))
         (org-map-entries
          (lambda ()
-           (when (org-entry-get nil "ANKI_NOTE_TYPE")
+           (when (and (= (org-outline-level) child-level)
+                      (org-entry-get nil "ANKI_NOTE_TYPE"))
              (push (org-get-heading t t t t) cards)))
          nil 'tree)))
     (nreverse cards)))
@@ -218,7 +222,7 @@ When nil, cards are generated in the same language as the source."
   "Insert RESPONSE (org headings from LLM) at the insertion marker."
   ;; Strip code block wrappers if present
   (let ((text response))
-    (when (string-match "\\`\\s-*```[a-z]*\n?" text)
+    (when (string-match "\\`\\s-*```[a-zA-Z]*\n?" text)
       (setq text (replace-match "" nil nil text)))
     (when (string-match "\n?```\\s-*\\'" text)
       (setq text (replace-match "" nil nil text)))
@@ -283,7 +287,9 @@ gptel-context instead of sending content directly."
   (let ((level (if (org-at-heading-p)
                    (1+ (org-outline-level))
                  (1+ (or (save-excursion
-                           (and (org-back-to-heading t)
+                           (and (condition-case nil
+                                    (org-back-to-heading t)
+                                  (error nil))
                                 (org-outline-level)))
                          0)))))
     (setq anki-noter--heading-level level)
@@ -319,7 +325,6 @@ With prefix ARG, prompt for template, card count, and topic focus."
   (anki-noter--prepare-insertion-point)
   (let* ((options (anki-noter--read-options arg))
          (card-count (or (plist-get options :card-count)
-                         (and arg nil)
                          anki-noter-card-count))
          (deck (anki-noter--get-deck))
          (tags (anki-noter--get-tags))
