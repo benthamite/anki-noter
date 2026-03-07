@@ -25,6 +25,8 @@ jobs:
           git clone --depth 1 https://github.com/anki-editor/anki-editor.git /tmp/anki-editor
           git clone --depth 1 https://github.com/emacs-compat/compat.git /tmp/compat
           git clone --depth 1 https://github.com/magit/transient.git /tmp/transient
+          git clone --depth 1 https://github.com/tarsius/cond-let.git /tmp/cond-let
+          git clone --depth 1 https://github.com/emacs-straight/seq.git /tmp/seq
 
       - name: Run tests
         run: |
@@ -34,6 +36,8 @@ jobs:
             -L /tmp/anki-editor \
             -L /tmp/compat \
             -L /tmp/transient/lisp \
+            -L /tmp/cond-let \
+            -L /tmp/seq \
             --eval "(require 'ert)" \
             --eval "(require 'cl-lib)" \
             -l test/anki-noter-prompts-test.el \
@@ -48,4 +52,6 @@ jobs:
             -L /tmp/anki-editor \
             -L /tmp/compat \
             -L /tmp/transient/lisp \
+            -L /tmp/cond-let \
+            -L /tmp/seq \
             -f batch-byte-compile anki-noter-prompts.el anki-noter.el
