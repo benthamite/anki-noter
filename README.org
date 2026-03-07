@@ -1,4 +1,4 @@
-#+title: =anki-noter=: generate Anki flashcards from source material via LLM
+#+title: =anki-noter=: An AI-powered Anki notes generator
 #+author: Pablo Stafforini
 #+email: pablo@stafforini.com
 #+language: en
@@ -8,7 +8,7 @@
 #+texinfo_filename: anki-noter.info
 #+texinfo_dir_category: Emacs misc features
 #+texinfo_dir_title: Anki Noter: (anki-noter)
-#+texinfo_dir_desc: Generate Anki flashcards from source material via LLM
+#+texinfo_dir_desc: AI-powered Anki notes generator
 
 This manual describes the features and customization options for the Emacs Lisp file =anki-noter.el=.
 
