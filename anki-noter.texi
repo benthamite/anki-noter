@@ -1,0 +1,314 @@
+\input texinfo    @c -*- texinfo -*-
+@c %**start of header
+@setfilename anki-noter.info
+@settitle @samp{anki-noter}: An AI-powered Anki notes generator
+@documentencoding UTF-8
+@documentlanguage en
+@c %**end of header
+
+@dircategory Emacs misc features
+@direntry
+* Anki Noter: (anki-noter). AI-powered Anki notes generator.
+@end direntry
+
+@finalout
+@titlepage
+@author Pablo Stafforini (@email{pablo@@stafforini.com})
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top @samp{anki-noter}: An AI-powered Anki notes generator
+
+This manual describes the features and customization options for the Emacs Lisp file @samp{anki-noter.el}. @*
+
+@end ifnottex
+
+@menu
+* Overview::
+* User options::
+* Commands::
+* Functions::
+* Indices::
+
+@detailmenu
+--- The Detailed Node Listing ---
+
+User options
+
+* Card generation::
+* Template configuration::
+* Citation::
+* PDF handling::
+* Anki integration::
+
+Commands
+
+* The transient menu::
+* Generating cards::
+
+The transient menu
+
+* Source::
+* Target::
+* Options::
+* Actions::
+
+Functions
+
+* Prompt assembly::
+
+Indices
+
+* Function index::
+* Variable index::
+
+@end detailmenu
+@end menu
+
+@node Overview
+@chapter Overview
+
+@samp{anki-noter.el} uses a large language model (via @samp{gptel}) to generate Anki flashcards from various source materials and inserts them as org-mode headings formatted for @samp{anki-editor}.  It bridges two workflows: reading source material and producing spaced-repetition cards, by delegating the extraction of atomic knowledge to an LLM@. @*
+
+The package accepts three kinds of input: @*
+
+@itemize
+@item
+The current buffer or active region. @*
+@item
+An external file, including PDFs (with native multimodal support for Anthropic and Google backends, and a @samp{pdftotext} fallback for others). @*
+@item
+A URL, whose content is fetched and rendered before being sent to the LLM@. @*
+@end itemize
+
+Generated cards are inserted as org-mode subtrees at point, with the correct heading level and property drawers (@code{ANKI_DECK}, @code{ANKI_NOTE_TYPE}, @code{ANKI_TAGS}, @code{ANKI_FORMAT}) already in place.  After insertion, the package optionally pushes the new notes to Anki via @samp{anki-editor}. @*
+
+A template system lets users switch between prompt strategies for different domains---general non-fiction, language learning, programming---and custom templates can be added through the @code{anki-noter-prompt-templates} user option (@ref{Template configuration}). @*
+
+The single entry point is the @samp{M-x anki-noter} command, which opens a transient menu where you configure the source, target, and generation options before invoking the generate action (@ref{The transient menu}). @*
+
+The package requires Emacs 28.1 or later, @samp{gptel} 0.9+, and @samp{anki-editor} 0.3+.  The @samp{transient} library is also required, but it is bundled with Emacs 28.1 and later. @*
+
+@node User options
+@chapter User options
+
+@menu
+* Card generation::
+* Template configuration::
+* Citation::
+* PDF handling::
+* Anki integration::
+@end menu
+
+@node Card generation
+@section Card generation
+
+@vindex anki-noter-card-count
+@vindex anki-noter-language
+@vindex anki-noter-anki-format
+
+The user option @code{anki-noter-card-count} sets the default target number of cards to generate.  It accepts either an integer or @code{nil}.  When @code{nil} (the default), the LLM decides how many cards are appropriate for the given source material.  Set this to a specific number when you want consistent output size---for instance, when processing many short passages and you want roughly five cards from each.  This default can be overridden per invocation via the @samp{c} key in the transient menu (@ref{The transient menu}). @*
+
+The user option @code{anki-noter-language} controls the output language for generated cards.  When @code{nil} (the default), cards are generated in the same language as the source material.  Set this to a language name (e.g., @samp{"Spanish"}) to produce cards in a different language---useful, for example, when reading English-language material but studying in your native language.  This default can be overridden per invocation via the @samp{l} key in the transient menu. @*
+
+The user option @code{anki-noter-anki-format} specifies the value for the @code{ANKI_FORMAT} property on generated cards.  The default is @code{nil}, which means cards use org-mode format.  Set this to a string if your @samp{anki-editor} setup requires a specific format value. @*
+
+@node Template configuration
+@section Template configuration
+
+@vindex anki-noter-default-template
+@vindex anki-noter-prompt-templates
+
+The user option @code{anki-noter-default-template} specifies which prompt template to use by default.  Its value must be a string matching a key in @code{anki-noter-prompt-templates}.  The default is @samp{"general"}.  Change this if you most often generate cards for a specific domain---for instance, set it to @samp{"programming"} if you primarily read technical material.  You can also change the template per invocation via the @samp{T} key in the transient menu (@ref{The transient menu}). @*
+
+The user option @code{anki-noter-prompt-templates} is an association list of named prompt templates.  Each entry is a cons cell of @code{(NAME . PROMPT-STRING)}, where @code{NAME} is a string used to identify the template and @code{PROMPT-STRING} is the domain-specific instruction appended to the base system prompt.  Three templates are provided by default: @*
+
+@itemize
+@item
+@samp{"general"} --- for non-fiction material: key facts, definitions, relationships, cause-effect pairs, and notable claims. @*
+@item
+@samp{"language"} --- for language learning: vocabulary, idiomatic expressions, grammar rules, and bilingual cards when the output language differs from the source. @*
+@item
+@samp{"programming"} --- for programming and computer science: concepts, API facts, code behavior, algorithm properties, and design patterns, with an emphasis on understanding over recall. @*
+@end itemize
+
+To add a custom template, push a new cons cell onto this list: @*
+
+@lisp
+(add-to-list 'anki-noter-prompt-templates
+             '("philosophy" . "You are generating flashcards about philosophy. Focus on arguments, distinctions, thought experiments, and key claims by specific thinkers."))
+@end lisp
+
+@node Citation
+@section Citation
+
+@vindex anki-noter-cite-sources
+@vindex anki-noter-cite-format
+
+The user option @code{anki-noter-cite-sources} controls whether a source citation is appended to the back of each generated card.  When @code{nil} (the default), no citation is added.  Set this to @code{t} to enable citations.  This default can be toggled per invocation via the @samp{s} key in the transient menu (@ref{The transient menu}). @*
+
+The user option @code{anki-noter-cite-format} controls the format string used for source citations.  The @samp{%s} placeholder is replaced with the source description (file name, URL, or buffer name).  The default is @samp{"Source: %s"}.  Customize this if you prefer a different citation style---for example, @samp{"Ref: %s"} or @samp{"[%s]"}. @*
+
+@node PDF handling
+@section PDF handling
+
+@vindex anki-noter-pdf-fallback-command
+
+The user option @code{anki-noter-pdf-fallback-command} specifies the shell command used to extract text from PDF files when the current @samp{gptel} backend does not support native PDF input.  The @samp{%s} placeholder is replaced with the (shell-quoted) file path.  The default is @samp{"pdftotext %s -"}, which sends the extracted text to standard output. @*
+
+Native PDF support is detected automatically: Anthropic (Claude) and Google (Gemini) backends can process PDF files directly via @code{gptel-context-add-file}, so this fallback is only used with other backends such as OpenAI@.  If @samp{pdftotext} is not available on your system, install it (it is part of the @samp{poppler-utils} package on most systems) or configure this option to use an alternative tool. @*
+
+@node Anki integration
+@section Anki integration
+
+@vindex anki-noter-auto-push
+
+The user option @code{anki-noter-auto-push} controls whether newly generated notes are pushed to Anki automatically.  When @code{nil} (the default), the package prompts you with a confirmation after inserting cards.  Set this to @code{t} to skip the prompt and push immediately---convenient when you trust the LLM output and want a streamlined workflow.  Pushing requires @samp{anki-editor} and a running AnkiConnect instance. @*
+
+@node Commands
+@chapter Commands
+
+@menu
+* The transient menu::
+* Generating cards::
+@end menu
+
+@node The transient menu
+@section The transient menu
+
+@findex anki-noter
+
+The command @code{anki-noter} is the single entry point to the package.  It opens a transient menu that displays all configurable parameters, organized into three groups: source, target, and options.  You configure the parameters you need and then press @samp{g} to generate cards. @*
+
+The transient initializes its values from the corresponding user options and org context: @code{anki-noter-default-template}, @code{anki-noter-card-count}, @code{anki-noter-language}, and @code{anki-noter-cite-sources} supply the defaults for their respective fields, while @code{ANKI_DECK} and @code{ANKI_TAGS} are inherited from the org heading tree when available. @*
+
+The menu is organized as follows: @*
+
+@menu
+* Source::
+* Target::
+* Options::
+* Actions::
+@end menu
+
+@node Source
+@subsection Source
+
+@itemize
+@item
+@samp{f} (@strong{File}) --- set the source file.  Prompts with @code{read-file-name}.  PDF files are handled transparently: on backends with native PDF support (Anthropic, Google), the file is added to the @samp{gptel} context directly; on other backends, text is extracted via the fallback command (@ref{PDF handling}). @*
+@item
+@samp{u} (@strong{URL}) --- set a URL as the source.  The page is fetched asynchronously, its HTML is rendered to plain text via @code{shr-render-region}, and the resulting text is sent to the LLM@. @*
+@item
+@samp{r} (@strong{Page range}) --- set a page range for PDF files (e.g., @samp{"1-20"}).  Only meaningful when a PDF file is set as the source. @*
+@end itemize
+
+If neither a file nor a URL is set, the current buffer content is used as the source.  If a region is active, only the selected text is sent. @*
+
+@node Target
+@subsection Target
+
+@itemize
+@item
+@samp{d} (@strong{Deck}) --- set the Anki deck.  Prompts with @code{completing-read} from deck names obtained via @code{anki-editor-deck-names}.  If not set in the transient, the deck is inherited from the org context (@code{ANKI_DECK} property up the heading tree); if no org context value is found, you are prompted interactively when generating. @*
+@item
+@samp{t} (@strong{Tags}) --- set Anki tags.  Prompts with @code{completing-read-multiple} from tags obtained via @code{anki-editor-all-tags}.  Follows the same fallback logic as deck: org context inheritance, then interactive prompt. @*
+@end itemize
+
+@node Options
+@subsection Options
+
+@itemize
+@item
+@samp{T} (@strong{Template}) --- select the prompt template.  Prompts with @code{completing-read} from the keys of @code{anki-noter-prompt-templates}.  Defaults to @code{anki-noter-default-template}. @*
+@item
+@samp{c} (@strong{Card count}) --- set the target number of cards.  When unset, the LLM decides the appropriate number.  Defaults to @code{anki-noter-card-count}. @*
+@item
+@samp{l} (@strong{Language}) --- set the output language.  When unset, cards are generated in the same language as the source.  Defaults to @code{anki-noter-language}. @*
+@item
+@samp{o} (@strong{Topic focus}) --- narrow generation to a specific topic within the source material.  When unset, the LLM considers the full content. @*
+@item
+@samp{s} (@strong{Cite sources}) --- toggle whether to append a source citation to each card back.  Defaults to @code{anki-noter-cite-sources}. @*
+@end itemize
+
+@node Actions
+@subsection Actions
+
+@itemize
+@item
+@samp{g} (@strong{Generate}) --- run @code{anki-noter-generate} with the current transient settings. @*
+@end itemize
+
+@node Generating cards
+@section Generating cards
+
+@findex anki-noter-generate
+
+The command @code{anki-noter-generate} is a suffix action within the @code{anki-noter} transient.  It reads the current transient arguments, determines the insertion point and heading level from the org context, builds a system prompt from the active template and options, sends the source material to the LLM via @samp{gptel}, parses the response, and inserts the resulting org headings at point.  After insertion, it optionally pushes the new notes to Anki (@ref{Anki integration}). @*
+
+The command also performs @emph{incremental generation}: it scans sibling headings that already have an @code{ANKI_NOTE_TYPE} property and includes their front text in the prompt, instructing the LLM not to produce duplicate cards.  This means you can invoke generation multiple times on the same source and get fresh cards each time. @*
+
+The source is determined by the transient arguments: @*
+
+@enumerate
+@item
+If a @strong{file} is set, that file is used.  PDF files are handled transparently depending on the backend (@ref{PDF handling}). @*
+@item
+If a @strong{URL} is set, the page is fetched and its rendered text is used. @*
+@item
+If neither is set, the @strong{current buffer content} (or active region) is used. @*
+@end enumerate
+
+The @strong{deck} and @strong{tags} are resolved in order: transient value, then org context inheritance (@code{ANKI_DECK} / @code{ANKI_TAGS} properties up the heading tree), then interactive prompt. @*
+
+While @code{anki-noter-generate} can be called directly with @samp{M-x anki-noter-generate}, it is designed to be invoked from within the transient menu, where its arguments are set via the infix controls described above. @*
+
+@node Functions
+@chapter Functions
+
+@menu
+* Prompt assembly::
+@end menu
+
+@node Prompt assembly
+@section Prompt assembly
+
+@findex anki-noter-prompts-build
+
+The function @code{anki-noter-prompts-build} assembles the full system prompt sent to the LLM@.  It takes a template name, deck string, and tags string as positional arguments, plus the following keyword arguments: @code{:card-count}, @code{:language}, @code{:cite-source}, @code{:existing-cards}, and @code{:topic}. @*
+
+The function retrieves the template text from @code{anki-noter-prompt-templates}, constructs the base prompt (which includes the output format specification, card quality guidelines, and any conditional sections for citation, card count, language, topic focus, and existing cards), and appends the template-specific instructions. @*
+
+This function is useful if you want to build prompts programmatically for custom workflows---for example, to generate cards in batch or to inspect the prompt before sending it: @*
+
+@lisp
+(let ((prompt (anki-noter-prompts-build
+               "general" "Default" "study"
+               :card-count 10
+               :language "Spanish"
+               :cite-source "my-notes.org")))
+  (message "%s" prompt))
+@end lisp
+
+@node Indices
+@chapter Indices
+
+@menu
+* Function index::
+* Variable index::
+@end menu
+
+@node Function index
+@section Function index
+
+@printindex fn
+
+@node Variable index
+@section Variable index
+
+@printindex vr
+
+@bye
