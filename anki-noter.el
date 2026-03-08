@@ -271,7 +271,7 @@ Only direct children of the parent heading are considered."
 CALLBACK is called with the response. If FILE is non-nil, add it to
 gptel-context instead of sending content directly."
   (unless gptel-backend
-    (user-error "gptel is not configured. Set up a backend with `gptel-make-openai' or similar"))
+    (user-error "The gptel dependency is not configured. Set up a backend with `gptel-make-openai' or similar"))
   (if file
       ;; Use gptel-context for file-based input
       (progn
@@ -316,7 +316,8 @@ gptel-context instead of sending content directly."
 (defclass anki-noter--prefix (transient-prefix) ())
 
 (cl-defmethod transient-init-value ((obj anki-noter--prefix))
-  "Initialize transient values from defcustoms and org context."
+  "Initialize transient values for OBJ of ANKI-NOTER--PREFIX.
+Values are derived from defcustoms and org context."
   (oset obj value
         (delq nil
               (list
@@ -421,7 +422,7 @@ gptel-context instead of sending content directly."
   :key "s"
   :argument "--cite")
 
-;;;###autoload
+;;;###autoload (autoload 'anki-noter "anki-noter" "Generate Anki flashcards from source material via LLM." t)
 (transient-define-prefix anki-noter ()
   "Generate Anki flashcards from source material via LLM."
   :class 'anki-noter--prefix
