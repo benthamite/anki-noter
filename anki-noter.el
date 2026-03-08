@@ -24,6 +24,9 @@
 (require 'transient)
 (require 'anki-noter-prompts)
 
+(declare-function gptel-context-add-file "gptel-context" (path))
+(declare-function gptel-context-remove "gptel-context" (&optional context))
+
 ;;;; Customization
 
 (defgroup anki-noter nil
