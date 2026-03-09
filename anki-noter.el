@@ -313,11 +313,8 @@ gptel-context instead of sending content directly."
 
 ;;;; Transient
 
-(defclass anki-noter--prefix (transient-prefix) ())
-
-(cl-defmethod transient-init-value ((obj anki-noter--prefix))
-  "Initialize transient values for OBJ of ANKI-NOTER--PREFIX.
-Values are derived from defcustoms and org context."
+(defun anki-noter--init-value (obj)
+  "Initialize transient values for OBJ from defcustoms and org context."
   (oset obj value
         (delq nil
               (list
@@ -425,7 +422,7 @@ Values are derived from defcustoms and org context."
 ;;;###autoload (autoload 'anki-noter "anki-noter" "Generate Anki flashcards from source material via LLM." t)
 (transient-define-prefix anki-noter ()
   "Generate Anki flashcards from source material via LLM."
-  :class 'anki-noter--prefix
+  :init-value #'anki-noter--init-value
   ["Source"
    (anki-noter--infix-file)
    (anki-noter--infix-url)
