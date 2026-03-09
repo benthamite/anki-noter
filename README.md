@@ -57,42 +57,9 @@ For documents that may exceed the LLM's context window, you can specify a page r
 
 ## Usage
 
-Run `M-x anki-noter` to open the transient menu. The menu is organized into three groups:
+Run `M-x anki-noter` to open the transient menu. The menu is organized into three groups.
 
-### Source
-
-| Key | Parameter | Description |
-|-----|-----------|-------------|
-| `f` | File | Set a file path as the source |
-| `u` | URL | Set a URL as the source |
-| `r` | Page range | Restrict to a page range (e.g. "1-20") for PDFs |
-
-If neither file nor URL is set, the current buffer content (or active region) is used.
-
-### Target
-
-| Key | Parameter | Description |
-|-----|-----------|-------------|
-| `d` | Deck | Anki deck, with completion from Anki via anki-editor |
-| `t` | Tags | Anki tags, with `completing-read-multiple` from Anki via anki-editor |
-
-If deck or tags are not set in the transient, they fall back to org context inheritance (walking up the org tree for `ANKI_DECK` / `ANKI_TAGS` properties), then prompt interactively.
-
-### Options
-
-| Key | Parameter | Description |
-|-----|-----------|-------------|
-| `T` | Template | Prompt template to use (default: `general`) |
-| `c` | Card count | Target number of cards (LLM decides if unset) |
-| `l` | Language | Output language (inherits source language if unset) |
-| `o` | Topic focus | Restrict card generation to a specific topic |
-| `s` | Cite sources | Toggle source citation on card backs |
-
-### Actions
-
-| Key | Action | Description |
-|-----|--------|-------------|
-| `g` | Generate | Generate cards with the current settings |
+![](screenshot.png)
 
 The transient initializes its values from your defcustom settings and the current org context, so you only need to adjust what differs from your defaults.
 
