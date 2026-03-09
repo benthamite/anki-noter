@@ -422,6 +422,7 @@ gptel-context instead of sending content directly."
 ;;;###autoload (autoload 'anki-noter "anki-noter" "Generate Anki flashcards from source material via LLM." t)
 (transient-define-prefix anki-noter ()
   "Generate Anki flashcards from source material via LLM."
+  :info-manual "(anki-noter)"
   :init-value #'anki-noter--init-value
   ["Source"
    (anki-noter--infix-file)

@@ -1,0 +1,482 @@
+This is anki-noter.info, produced by makeinfo version 7.2 from
+anki-noter.texi.
+
+INFO-DIR-SECTION Emacs misc features
+START-INFO-DIR-ENTRY
+* Anki Noter: (anki-noter). AI-powered Anki notes generator.
+END-INFO-DIR-ENTRY
+
+
+File: anki-noter.info,  Node: Top,  Next: Overview,  Up: (dir)
+
+‘anki-noter’: An AI-powered Anki notes generator
+************************************************
+
+This manual describes the features and customization options for the
+Emacs Lisp file ‘anki-noter.el’.
+
+* Menu:
+
+* Overview::
+* User options::
+* Commands::
+* Functions::
+* Indices::
+
+-- The Detailed Node Listing --
+
+User options
+
+* Card generation::
+* Template configuration::
+* Citation::
+* PDF handling::
+* Anki integration::
+
+Commands
+
+* The transient menu::
+* Generating cards::
+
+The transient menu
+
+* Source::
+* Target::
+* Options::
+* Actions::
+
+Functions
+
+* Prompt assembly::
+
+Indices
+
+* Function index::
+* Variable index::
+
+
+File: anki-noter.info,  Node: Overview,  Next: User options,  Prev: Top,  Up: Top
+
+1 Overview
+**********
+
+‘anki-noter.el’ uses a large language model (via ‘gptel’) to generate
+Anki flashcards from various source materials and inserts them as
+org-mode headings formatted for ‘anki-editor’.  It bridges two
+workflows: reading source material and producing spaced-repetition
+cards, by delegating the extraction of atomic knowledge to an LLM.
+
+   The package accepts three kinds of input:
+
+   • The current buffer or active region.
+   • An external file, including PDFs (with native multimodal support
+     for Anthropic and Google backends, and a ‘pdftotext’ fallback for
+     others).
+   • A URL, whose content is fetched and rendered before being sent to
+     the LLM.
+
+   Generated cards are inserted as org-mode subtrees at point, with the
+correct heading level and property drawers (‘ANKI_DECK’,
+‘ANKI_NOTE_TYPE’, ‘ANKI_TAGS’, ‘ANKI_FORMAT’) already in place.  After
+insertion, the package optionally pushes the new notes to Anki via
+‘anki-editor’.
+
+   A template system lets users switch between prompt strategies for
+different domains--general non-fiction, language learning,
+programming--and custom templates can be added through the
+‘anki-noter-prompt-templates’ user option (*note Template
+configuration::).
+
+   The single entry point is the ‘M-x anki-noter’ command, which opens a
+transient menu where you configure the source, target, and generation
+options before invoking the generate action (*note The transient
+menu::).
+
+   The package requires Emacs 28.1 or later, ‘gptel’ 0.9+, and
+‘anki-editor’ 0.3+.  The ‘transient’ library is also required, but it is
+bundled with Emacs 28.1 and later.
+
+
+File: anki-noter.info,  Node: User options,  Next: Commands,  Prev: Overview,  Up: Top
+
+2 User options
+**************
+
+* Menu:
+
+* Card generation::
+* Template configuration::
+* Citation::
+* PDF handling::
+* Anki integration::
+
+
+File: anki-noter.info,  Node: Card generation,  Next: Template configuration,  Up: User options
+
+2.1 Card generation
+===================
+
+The user option ‘anki-noter-card-count’ sets the default target number
+of cards to generate.  It accepts either an integer or ‘nil’.  When
+‘nil’ (the default), the LLM decides how many cards are appropriate for
+the given source material.  Set this to a specific number when you want
+consistent output size--for instance, when processing many short
+passages and you want roughly five cards from each.  This default can be
+overridden per invocation via the ‘c’ key in the transient menu (*note
+The transient menu::).
+
+   The user option ‘anki-noter-language’ controls the output language
+for generated cards.  When ‘nil’ (the default), cards are generated in
+the same language as the source material.  Set this to a language name
+(e.g., ‘"Spanish"’) to produce cards in a different language--useful,
+for example, when reading English-language material but studying in your
+native language.  This default can be overridden per invocation via the
+‘l’ key in the transient menu.
+
+   The user option ‘anki-noter-anki-format’ specifies the value for the
+‘ANKI_FORMAT’ property on generated cards.  The default is ‘nil’, which
+means cards use org-mode format.  Set this to a string if your
+‘anki-editor’ setup requires a specific format value.
+
+
+File: anki-noter.info,  Node: Template configuration,  Next: Citation,  Prev: Card generation,  Up: User options
+
+2.2 Template configuration
+==========================
+
+The user option ‘anki-noter-default-template’ specifies which prompt
+template to use by default.  Its value must be a string matching a key
+in ‘anki-noter-prompt-templates’.  The default is ‘"general"’.  Change
+this if you most often generate cards for a specific domain--for
+instance, set it to ‘"programming"’ if you primarily read technical
+material.  You can also change the template per invocation via the ‘T’
+key in the transient menu (*note The transient menu::).
+
+   The user option ‘anki-noter-prompt-templates’ is an association list
+of named prompt templates.  Each entry is a cons cell of ‘(NAME .
+PROMPT-STRING)’, where ‘NAME’ is a string used to identify the template
+and ‘PROMPT-STRING’ is the domain-specific instruction appended to the
+base system prompt.  Three templates are provided by default:
+
+   • ‘"general"’ -- for non-fiction material: key facts, definitions,
+     relationships, cause-effect pairs, and notable claims.
+   • ‘"language"’ -- for language learning: vocabulary, idiomatic
+     expressions, grammar rules, and bilingual cards when the output
+     language differs from the source.
+   • ‘"programming"’ -- for programming and computer science: concepts,
+     API facts, code behavior, algorithm properties, and design
+     patterns, with an emphasis on understanding over recall.
+
+   To add a custom template, push a new cons cell onto this list:
+
+     (add-to-list 'anki-noter-prompt-templates
+                  '("philosophy" . "You are generating flashcards about philosophy. Focus on arguments, distinctions, thought experiments, and key claims by specific thinkers."))
+
+
+File: anki-noter.info,  Node: Citation,  Next: PDF handling,  Prev: Template configuration,  Up: User options
+
+2.3 Citation
+============
+
+The user option ‘anki-noter-cite-sources’ controls whether a source
+citation is appended to the back of each generated card.  When ‘nil’
+(the default), no citation is added.  Set this to ‘t’ to enable
+citations.  This default can be toggled per invocation via the ‘s’ key
+in the transient menu (*note The transient menu::).
+
+   The user option ‘anki-noter-cite-format’ controls the format string
+used for source citations.  The ‘%s’ placeholder is replaced with the
+source description (file name, URL, or buffer name).  The default is
+‘"Source: %s"’.  Customize this if you prefer a different citation
+style--for example, ‘"Ref: %s"’ or ‘"[%s]"’.
+
+
+File: anki-noter.info,  Node: PDF handling,  Next: Anki integration,  Prev: Citation,  Up: User options
+
+2.4 PDF handling
+================
+
+The user option ‘anki-noter-pdf-fallback-command’ specifies the shell
+command used to extract text from PDF files when the current ‘gptel’
+backend does not support native PDF input.  The ‘%s’ placeholder is
+replaced with the (shell-quoted) file path.  The default is ‘"pdftotext
+%s -"’, which sends the extracted text to standard output.
+
+   Native PDF support is detected automatically: Anthropic (Claude) and
+Google (Gemini) backends can process PDF files directly via
+‘gptel-context-add-file’, so this fallback is only used with other
+backends such as OpenAI.  If ‘pdftotext’ is not available on your
+system, install it (it is part of the ‘poppler-utils’ package on most
+systems) or configure this option to use an alternative tool.
+
+
+File: anki-noter.info,  Node: Anki integration,  Prev: PDF handling,  Up: User options
+
+2.5 Anki integration
+====================
+
+The user option ‘anki-noter-auto-push’ controls whether newly generated
+notes are pushed to Anki automatically.  When ‘nil’ (the default), the
+package prompts you with a confirmation after inserting cards.  Set this
+to ‘t’ to skip the prompt and push immediately--convenient when you
+trust the LLM output and want a streamlined workflow.  Pushing requires
+‘anki-editor’ and a running AnkiConnect instance.
+
+
+File: anki-noter.info,  Node: Commands,  Next: Functions,  Prev: User options,  Up: Top
+
+3 Commands
+**********
+
+* Menu:
+
+* The transient menu::
+* Generating cards::
+
+
+File: anki-noter.info,  Node: The transient menu,  Next: Generating cards,  Up: Commands
+
+3.1 The transient menu
+======================
+
+The command ‘anki-noter’ is the single entry point to the package.  It
+opens a transient menu that displays all configurable parameters,
+organized into three groups: source, target, and options.  You configure
+the parameters you need and then press ‘g’ to generate cards.
+
+   The transient initializes its values from the corresponding user
+options and org context: ‘anki-noter-default-template’,
+‘anki-noter-card-count’, ‘anki-noter-language’, and
+‘anki-noter-cite-sources’ supply the defaults for their respective
+fields, while ‘ANKI_DECK’ and ‘ANKI_TAGS’ are inherited from the org
+heading tree when available.
+
+   The menu is organized as follows:
+
+* Menu:
+
+* Source::
+* Target::
+* Options::
+* Actions::
+
+
+File: anki-noter.info,  Node: Source,  Next: Target,  Up: The transient menu
+
+3.1.1 Source
+------------
+
+   • ‘f’ (*File*) -- set the source file.  Prompts with
+     ‘read-file-name’.  PDF files are handled transparently: on backends
+     with native PDF support (Anthropic, Google), the file is added to
+     the ‘gptel’ context directly; on other backends, text is extracted
+     via the fallback command (*note PDF handling::).
+   • ‘u’ (*URL*) -- set a URL as the source.  The page is fetched
+     asynchronously, its HTML is rendered to plain text via
+     ‘shr-render-region’, and the resulting text is sent to the LLM.
+   • ‘r’ (*Page range*) -- set a page range for PDF files (e.g.,
+     ‘"1-20"’).  Only meaningful when a PDF file is set as the source.
+
+   If neither a file nor a URL is set, the current buffer content is
+used as the source.  If a region is active, only the selected text is
+sent.
+
+
+File: anki-noter.info,  Node: Target,  Next: Options,  Prev: Source,  Up: The transient menu
+
+3.1.2 Target
+------------
+
+   • ‘d’ (*Deck*) -- set the Anki deck.  Prompts with ‘completing-read’
+     from deck names obtained via ‘anki-editor-deck-names’.  If not set
+     in the transient, the deck is inherited from the org context
+     (‘ANKI_DECK’ property up the heading tree); if no org context value
+     is found, you are prompted interactively when generating.
+   • ‘t’ (*Tags*) -- set Anki tags.  Prompts with
+     ‘completing-read-multiple’ from tags obtained via
+     ‘anki-editor-all-tags’.  Follows the same fallback logic as deck:
+     org context inheritance, then interactive prompt.
+
+
+File: anki-noter.info,  Node: Options,  Next: Actions,  Prev: Target,  Up: The transient menu
+
+3.1.3 Options
+-------------
+
+   • ‘T’ (*Template*) -- select the prompt template.  Prompts with
+     ‘completing-read’ from the keys of ‘anki-noter-prompt-templates’.
+     Defaults to ‘anki-noter-default-template’.
+   • ‘c’ (*Card count*) -- set the target number of cards.  When unset,
+     the LLM decides the appropriate number.  Defaults to
+     ‘anki-noter-card-count’.
+   • ‘l’ (*Language*) -- set the output language.  When unset, cards are
+     generated in the same language as the source.  Defaults to
+     ‘anki-noter-language’.
+   • ‘o’ (*Topic focus*) -- narrow generation to a specific topic within
+     the source material.  When unset, the LLM considers the full
+     content.
+   • ‘s’ (*Cite sources*) -- toggle whether to append a source citation
+     to each card back.  Defaults to ‘anki-noter-cite-sources’.
+
+
+File: anki-noter.info,  Node: Actions,  Prev: Options,  Up: The transient menu
+
+3.1.4 Actions
+-------------
+
+   • ‘g’ (*Generate*) -- run ‘anki-noter-generate’ with the current
+     transient settings.
+
+
+File: anki-noter.info,  Node: Generating cards,  Prev: The transient menu,  Up: Commands
+
+3.2 Generating cards
+====================
+
+The command ‘anki-noter-generate’ is a suffix action within the
+‘anki-noter’ transient.  It reads the current transient arguments,
+determines the insertion point and heading level from the org context,
+builds a system prompt from the active template and options, sends the
+source material to the LLM via ‘gptel’, parses the response, and inserts
+the resulting org headings at point.  After insertion, it optionally
+pushes the new notes to Anki (*note Anki integration::).
+
+   The command also performs _incremental generation_: it scans sibling
+headings that already have an ‘ANKI_NOTE_TYPE’ property and includes
+their front text in the prompt, instructing the LLM not to produce
+duplicate cards.  This means you can invoke generation multiple times on
+the same source and get fresh cards each time.
+
+   The source is determined by the transient arguments:
+
+  1. If a *file* is set, that file is used.  PDF files are handled
+     transparently depending on the backend (*note PDF handling::).
+  2. If a *URL* is set, the page is fetched and its rendered text is
+     used.
+  3. If neither is set, the *current buffer content* (or active region)
+     is used.
+
+   The *deck* and *tags* are resolved in order: transient value, then
+org context inheritance (‘ANKI_DECK’ / ‘ANKI_TAGS’ properties up the
+heading tree), then interactive prompt.
+
+   While ‘anki-noter-generate’ can be called directly with ‘M-x
+anki-noter-generate’, it is designed to be invoked from within the
+transient menu, where its arguments are set via the infix controls
+described above.
+
+
+File: anki-noter.info,  Node: Functions,  Next: Indices,  Prev: Commands,  Up: Top
+
+4 Functions
+***********
+
+* Menu:
+
+* Prompt assembly::
+
+
+File: anki-noter.info,  Node: Prompt assembly,  Up: Functions
+
+4.1 Prompt assembly
+===================
+
+The function ‘anki-noter-prompts-build’ assembles the full system prompt
+sent to the LLM.  It takes a template name, deck string, and tags string
+as positional arguments, plus the following keyword arguments:
+‘:card-count’, ‘:language’, ‘:cite-source’, ‘:existing-cards’, and
+‘:topic’.
+
+   The function retrieves the template text from
+‘anki-noter-prompt-templates’, constructs the base prompt (which
+includes the output format specification, card quality guidelines, and
+any conditional sections for citation, card count, language, topic
+focus, and existing cards), and appends the template-specific
+instructions.
+
+   This function is useful if you want to build prompts programmatically
+for custom workflows--for example, to generate cards in batch or to
+inspect the prompt before sending it:
+
+     (let ((prompt (anki-noter-prompts-build
+                    "general" "Default" "study"
+                    :card-count 10
+                    :language "Spanish"
+                    :cite-source "my-notes.org")))
+       (message "%s" prompt))
+
+
+File: anki-noter.info,  Node: Indices,  Prev: Functions,  Up: Top
+
+5 Indices
+*********
+
+* Menu:
+
+* Function index::
+* Variable index::
+
+
+File: anki-noter.info,  Node: Function index,  Next: Variable index,  Up: Indices
+
+5.1 Function index
+==================
+
+ [index ]
+* Menu:
+
+* anki-noter:                            The transient menu.    (line 6)
+* anki-noter-generate:                   Generating cards.      (line 6)
+* anki-noter-prompts-build:              Prompt assembly.       (line 6)
+
+
+File: anki-noter.info,  Node: Variable index,  Prev: Function index,  Up: Indices
+
+5.2 Variable index
+==================
+
+ [index ]
+* Menu:
+
+* anki-noter-anki-format:                Card generation.       (line 6)
+* anki-noter-auto-push:                  Anki integration.      (line 6)
+* anki-noter-card-count:                 Card generation.       (line 6)
+* anki-noter-cite-format:                Citation.              (line 6)
+* anki-noter-cite-sources:               Citation.              (line 6)
+* anki-noter-default-template:           Template configuration.
+                                                                (line 6)
+* anki-noter-language:                   Card generation.       (line 6)
+* anki-noter-pdf-fallback-command:       PDF handling.          (line 6)
+* anki-noter-prompt-templates:           Template configuration.
+                                                                (line 6)
+
+
+Tag Table:
+Node: Top220
+Node: Overview923
+Node: User options2693
+Node: Card generation2922
+Node: Template configuration4347
+Node: Citation6185
+Node: PDF handling7009
+Node: Anki integration7916
+Node: Commands8472
+Node: The transient menu8640
+Node: Source9520
+Node: Target10465
+Node: Options11198
+Node: Actions12179
+Node: Generating cards12394
+Node: Functions14118
+Node: Prompt assembly14259
+Node: Indices15439
+Node: Function index15577
+Node: Variable index15942
+
+End Tag Table
+
+
+Local Variables:
+coding: utf-8
+Info-documentlanguage: en
+End:
