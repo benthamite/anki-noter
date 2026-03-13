@@ -276,8 +276,9 @@ gptel-context instead of sending content directly."
       ;; Use gptel-context for file-based input
       (progn
         (gptel-context-add-file file)
-        (gptel-request content
+        (gptel-request (or content "Generate Anki flashcards from the provided file.")
           :system system-prompt
+          :transforms '(t)
           :callback (lambda (response info)
                       (gptel-context-remove)
                       (if (not response)
