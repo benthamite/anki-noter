@@ -18,6 +18,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'org)
 (require 'gptel)
 (require 'anki-editor)
@@ -74,6 +75,21 @@ When nil, cards are generated in the same language as the source."
   "Command for PDF text extraction when native PDF input is unavailable.
 %s is replaced with the file path."
   :type 'string
+  :group 'anki-noter)
+
+(defcustom anki-noter-backend nil
+  "The gptel backend name for card generation, e.g. \"Gemini\" or \"Claude\".
+When nil, the backend is inferred from `anki-noter-model', falling
+back to `gptel-backend'."
+  :type '(choice (const :tag "Infer from model or use gptel default" nil)
+                 (string :tag "Backend name"))
+  :group 'anki-noter)
+
+(defcustom anki-noter-model nil
+  "The gptel model for card generation, e.g. `claude-sonnet-4-5-20250514'.
+When nil, defaults to `gptel-model'."
+  :type '(choice (const :tag "Use gptel default" nil)
+                 (symbol :tag "Model name"))
   :group 'anki-noter)
 
 (defcustom anki-noter-auto-push nil
@@ -162,11 +178,34 @@ Only direct children of the parent heading are considered."
     (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun anki-noter--pdf-native-p ()
-  "Return non-nil if the current gptel backend supports native PDF input."
-  (when-let ((backend gptel-backend))
-    (let ((name (gptel-backend-name backend)))
-      (or (string-match-p "claude\\|anthropic" (downcase name))
-          (string-match-p "gemini\\|google" (downcase name))))))
+  "Return non-nil if the active gptel backend supports native PDF input.
+Respects `anki-noter-backend' and `anki-noter-model'."
+  (let* ((resolved (anki-noter--resolve-backend-and-model))
+         (backend (car resolved)))
+    (when backend
+      (let ((name (gptel-backend-name backend)))
+        (or (string-match-p "claude\\|anthropic" (downcase name))
+            (string-match-p "gemini\\|google" (downcase name)))))))
+
+(defun anki-noter--find-backend-for-model (model)
+  "Return the gptel backend that provides MODEL, or nil."
+  (cl-loop for (_name . backend) in gptel--known-backends
+           when (member model (gptel-backend-models backend))
+           return backend))
+
+(defun anki-noter--resolve-backend-and-model ()
+  "Return (backend . model) for card generation.
+Resolves `anki-noter-backend' and `anki-noter-model', inferring the
+backend from the model when needed."
+  (let* ((model (or anki-noter-model gptel-model))
+         (backend (cond
+                   (anki-noter-backend
+                    (gptel-get-backend anki-noter-backend))
+                   (anki-noter-model
+                    (or (anki-noter--find-backend-for-model anki-noter-model)
+                        gptel-backend))
+                   (t gptel-backend))))
+    (cons backend model)))
 
 (defun anki-noter--extract-pdf-text (file)
   "Extract text from PDF FILE using the fallback command."
@@ -272,24 +311,27 @@ CALLBACK is called with the response. If FILE is non-nil, add it to
 gptel-context instead of sending content directly."
   (unless gptel-backend
     (user-error "The gptel dependency is not configured. Set up a backend with `gptel-make-openai' or similar"))
-  (if file
-      ;; Use gptel-context for file-based input
-      (progn
-        (gptel-context-add-file file)
-        (gptel-request (or content "Generate Anki flashcards from the provided file.")
-          :system system-prompt
-          :transforms '(t)
-          :callback (lambda (response info)
-                      (gptel-context-remove)
-                      (if (not response)
-                          (user-error "LLM request failed: %s" (plist-get info :status))
-                        (funcall callback response)))))
-    (gptel-request content
-      :system system-prompt
-      :callback (lambda (response info)
-                  (if (not response)
-                      (user-error "LLM request failed: %s" (plist-get info :status))
-                    (funcall callback response))))))
+  (let* ((resolved (anki-noter--resolve-backend-and-model))
+         (gptel-backend (car resolved))
+         (gptel-model (cdr resolved)))
+    (if file
+        ;; Use gptel-context for file-based input
+        (progn
+          (gptel-context-add-file file)
+          (gptel-request (or content "Generate Anki flashcards from the provided file.")
+            :system system-prompt
+            :transforms '(t)
+            :callback (lambda (response info)
+                        (gptel-context-remove)
+                        (if (not response)
+                            (user-error "LLM request failed: %s" (plist-get info :status))
+                          (funcall callback response)))))
+      (gptel-request content
+        :system system-prompt
+        :callback (lambda (response info)
+                    (if (not response)
+                        (user-error "LLM request failed: %s" (plist-get info :status))
+                      (funcall callback response)))))))
 
 ;;;; Setup helpers
 
