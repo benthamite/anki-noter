@@ -313,7 +313,8 @@ gptel-context instead of sending content directly."
     (user-error "The gptel dependency is not configured. Set up a backend with `gptel-make-openai' or similar"))
   (let* ((resolved (anki-noter--resolve-backend-and-model))
          (gptel-backend (car resolved))
-         (gptel-model (cdr resolved)))
+         (gptel-model (cdr resolved))
+         (gptel-use-tools nil))
     (if file
         ;; Use gptel-context for file-based input
         (progn
