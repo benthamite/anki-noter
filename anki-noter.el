@@ -462,6 +462,17 @@ gptel-context instead of sending content directly."
   :key "s"
   :argument "--cite")
 
+(transient-define-infix anki-noter--infix-model ()
+  :class 'transient-lisp-variable
+  :variable 'anki-noter-model
+  :description "AI model"
+  :reader (lambda (prompt _initial-input _history)
+            (let ((input (read-string
+                          prompt
+                          (when anki-noter-model
+                            (symbol-name anki-noter-model)))))
+              (if (string-empty-p input) nil (intern input)))))
+
 ;;;###autoload (autoload 'anki-noter "anki-noter" "Generate Anki flashcards from source material via LLM." t)
 (transient-define-prefix anki-noter ()
   "Generate Anki flashcards from source material via LLM."
@@ -479,7 +490,8 @@ gptel-context instead of sending content directly."
    (anki-noter--infix-count)
    (anki-noter--infix-language)
    (anki-noter--infix-topic)
-   (anki-noter--infix-cite)]
+   (anki-noter--infix-cite)
+   ("-m" anki-noter--infix-model)]
   ["Actions"
    ("g" "Generate" anki-noter-generate)])
 
