@@ -1,4 +1,4 @@
-# anki-noter
+# `anki-noter`: AI-power Anki notes generator
 
 An Emacs package that uses an LLM (via [gptel](https://github.com/karthink/gptel)) to generate Anki flashcards from various source materials and inserts them as org-mode headings formatted for [anki-editor](https://github.com/louietan/anki-editor).
 
