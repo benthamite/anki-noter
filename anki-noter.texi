@@ -41,6 +41,7 @@ User options
 * Card generation::
 * Template configuration::
 * Citation::
+* AI model::
 * PDF handling::
 * Anki integration::
 
@@ -99,6 +100,7 @@ The package requires Emacs 28.1 or later, @samp{gptel} 0.9+, and @samp{anki-edit
 * Card generation::
 * Template configuration::
 * Citation::
+* AI model::
 * PDF handling::
 * Anki integration::
 @end menu
@@ -151,6 +153,18 @@ To add a custom template, push a new cons cell onto this list: @*
 The user option @code{anki-noter-cite-sources} controls whether a source citation is appended to the back of each generated card.  When @code{nil} (the default), no citation is added.  Set this to @code{t} to enable citations.  This default can be toggled per invocation via the @samp{s} key in the transient menu (@ref{The transient menu}). @*
 
 The user option @code{anki-noter-cite-format} controls the format string used for source citations.  The @samp{%s} placeholder is replaced with the source description (file name, URL, or buffer name).  The default is @samp{"Source: %s"}.  Customize this if you prefer a different citation style---for example, @samp{"Ref: %s"} or @samp{"[%s]"}. @*
+
+@node AI model
+@section AI model
+
+@vindex anki-noter-backend
+@vindex anki-noter-model
+
+The user option @code{anki-noter-backend} specifies the @samp{gptel} backend name for card generation, e.g. @samp{"Gemini"} or @samp{"Claude"}.  When @code{nil} (the default), the backend is inferred from @code{anki-noter-model} if set, otherwise it falls back to @code{gptel-backend}.  Set this when you want to use a specific provider regardless of your global @samp{gptel} default. @*
+
+The user option @code{anki-noter-model} specifies the @samp{gptel} model for card generation, e.g. @code{claude-sonnet-4-5-20250514}.  When @code{nil} (the default), it uses @code{gptel-model}.  If you set a model but not a backend, the backend is inferred automatically by searching the registered @samp{gptel} backends for one that provides the requested model. @*
+
+Both options can be changed per session via the @samp{-m} key in the transient menu (@ref{The transient menu}), which sets @code{anki-noter-model} for the duration of the Emacs session. @*
 
 @node PDF handling
 @section PDF handling
@@ -232,6 +246,8 @@ If neither a file nor a URL is set, the current buffer content is used as the so
 @samp{o} (@strong{Topic focus}) --- narrow generation to a specific topic within the source material.  When unset, the LLM considers the full content. @*
 @item
 @samp{s} (@strong{Cite sources}) --- toggle whether to append a source citation to each card back.  Defaults to @code{anki-noter-cite-sources}. @*
+@item
+@samp{-m} (@strong{AI model}) --- set the @samp{gptel} model for this session.  Displays the current value of @code{anki-noter-model}; when unset, the global @code{gptel-model} is used.  See @ref{AI model}. @*
 @end itemize
 
 @node Actions

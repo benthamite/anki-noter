@@ -1,4 +1,4 @@
-This is anki-noter.info, produced by makeinfo version 7.2 from
+This is anki-noter.info, produced by makeinfo version 7.3 from
 anki-noter.texi.
 
 INFO-DIR-SECTION Emacs misc features
@@ -30,6 +30,7 @@ User options
 * Card generation::
 * Template configuration::
 * Citation::
+* AI model::
 * PDF handling::
 * Anki integration::
 
@@ -107,6 +108,7 @@ File: anki-noter.info,  Node: User options,  Next: Commands,  Prev: Overview,  U
 * Card generation::
 * Template configuration::
 * Citation::
+* AI model::
 * PDF handling::
 * Anki integration::
 
@@ -173,7 +175,7 @@ base system prompt.  Three templates are provided by default:
                   '("philosophy" . "You are generating flashcards about philosophy. Focus on arguments, distinctions, thought experiments, and key claims by specific thinkers."))
 
 
-File: anki-noter.info,  Node: Citation,  Next: PDF handling,  Prev: Template configuration,  Up: User options
+File: anki-noter.info,  Node: Citation,  Next: AI model,  Prev: Template configuration,  Up: User options
 
 2.3 Citation
 ============
@@ -191,9 +193,31 @@ source description (file name, URL, or buffer name).  The default is
 style--for example, ‘"Ref: %s"’ or ‘"[%s]"’.
 
 
-File: anki-noter.info,  Node: PDF handling,  Next: Anki integration,  Prev: Citation,  Up: User options
+File: anki-noter.info,  Node: AI model,  Next: PDF handling,  Prev: Citation,  Up: User options
 
-2.4 PDF handling
+2.4 AI model
+============
+
+The user option ‘anki-noter-backend’ specifies the ‘gptel’ backend name
+for card generation, e.g.  ‘"Gemini"’ or ‘"Claude"’.  When ‘nil’ (the
+default), the backend is inferred from ‘anki-noter-model’ if set,
+otherwise it falls back to ‘gptel-backend’.  Set this when you want to
+use a specific provider regardless of your global ‘gptel’ default.
+
+   The user option ‘anki-noter-model’ specifies the ‘gptel’ model for
+card generation, e.g.  ‘claude-sonnet-4-5-20250514’.  When ‘nil’ (the
+default), it uses ‘gptel-model’.  If you set a model but not a backend,
+the backend is inferred automatically by searching the registered
+‘gptel’ backends for one that provides the requested model.
+
+   Both options can be changed per session via the ‘-m’ key in the
+transient menu (*note The transient menu::), which sets
+‘anki-noter-model’ for the duration of the Emacs session.
+
+
+File: anki-noter.info,  Node: PDF handling,  Next: Anki integration,  Prev: AI model,  Up: User options
+
+2.5 PDF handling
 ================
 
 The user option ‘anki-noter-pdf-fallback-command’ specifies the shell
@@ -212,7 +236,7 @@ systems) or configure this option to use an alternative tool.
 
 File: anki-noter.info,  Node: Anki integration,  Prev: PDF handling,  Up: User options
 
-2.5 Anki integration
+2.6 Anki integration
 ====================
 
 The user option ‘anki-noter-auto-push’ controls whether newly generated
@@ -317,6 +341,9 @@ File: anki-noter.info,  Node: Options,  Next: Actions,  Prev: Target,  Up: The t
      content.
    • ‘s’ (*Cite sources*) -- toggle whether to append a source citation
      to each card back.  Defaults to ‘anki-noter-cite-sources’.
+   • ‘-m’ (*AI model*) -- set the ‘gptel’ model for this session.
+     Displays the current value of ‘anki-noter-model’; when unset, the
+     global ‘gptel-model’ is used.  See *note AI model::.
 
 
 File: anki-noter.info,  Node: Actions,  Prev: Options,  Up: The transient menu
@@ -440,12 +467,14 @@ File: anki-noter.info,  Node: Variable index,  Prev: Function index,  Up: Indice
 
 * anki-noter-anki-format:                Card generation.       (line 6)
 * anki-noter-auto-push:                  Anki integration.      (line 6)
+* anki-noter-backend:                    AI model.              (line 6)
 * anki-noter-card-count:                 Card generation.       (line 6)
 * anki-noter-cite-format:                Citation.              (line 6)
 * anki-noter-cite-sources:               Citation.              (line 6)
 * anki-noter-default-template:           Template configuration.
                                                                 (line 6)
 * anki-noter-language:                   Card generation.       (line 6)
+* anki-noter-model:                      AI model.              (line 6)
 * anki-noter-pdf-fallback-command:       PDF handling.          (line 6)
 * anki-noter-prompt-templates:           Template configuration.
                                                                 (line 6)
@@ -453,25 +482,26 @@ File: anki-noter.info,  Node: Variable index,  Prev: Function index,  Up: Indice
 
 Tag Table:
 Node: Top220
-Node: Overview923
-Node: User options2693
-Node: Card generation2922
-Node: Template configuration4347
-Node: Citation6185
-Node: PDF handling7009
-Node: Anki integration7916
-Node: Commands8472
-Node: The transient menu8640
-Node: Source9520
-Node: Target10465
-Node: Options11198
-Node: Actions12179
-Node: Generating cards12394
-Node: Functions14118
-Node: Prompt assembly14259
-Node: Indices15439
-Node: Function index15577
-Node: Variable index15942
+Node: Overview936
+Node: User options2706
+Node: Card generation2948
+Node: Template configuration4373
+Node: Citation6211
+Node: AI model7031
+Node: PDF handling8089
+Node: Anki integration8996
+Node: Commands9552
+Node: The transient menu9720
+Node: Source10600
+Node: Target11545
+Node: Options12278
+Node: Actions13472
+Node: Generating cards13687
+Node: Functions15411
+Node: Prompt assembly15552
+Node: Indices16732
+Node: Function index16870
+Node: Variable index17235
 
 End Tag Table
 

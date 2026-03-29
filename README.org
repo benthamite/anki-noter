@@ -88,6 +88,20 @@ The user option ~anki-noter-cite-sources~ controls whether a source citation is 
 
 The user option ~anki-noter-cite-format~ controls the format string used for source citations.  The =%s= placeholder is replaced with the source description (file name, URL, or buffer name).  The default is ="Source: %s"=.  Customize this if you prefer a different citation style---for example, ="Ref: %s"= or ="[%s]"=.
 
+** AI model
+:PROPERTIES:
+:CUSTOM_ID: h:ai-model-options
+:END:
+
+#+vindex: anki-noter-backend
+#+vindex: anki-noter-model
+
+The user option ~anki-noter-backend~ specifies the =gptel= backend name for card generation, e.g. ="Gemini"= or ="Claude"=.  When ~nil~ (the default), the backend is inferred from ~anki-noter-model~ if set, otherwise it falls back to ~gptel-backend~.  Set this when you want to use a specific provider regardless of your global =gptel= default.
+
+The user option ~anki-noter-model~ specifies the =gptel= model for card generation, e.g. ~claude-sonnet-4-5-20250514~.  When ~nil~ (the default), it uses ~gptel-model~.  If you set a model but not a backend, the backend is inferred automatically by searching the registered =gptel= backends for one that provides the requested model.
+
+Both options can be changed per session via the =-m= key in the transient menu ([[#h:the-transient-menu][The transient menu]]), which sets ~anki-noter-model~ for the duration of the Emacs session.
+
 ** PDF handling
 :PROPERTIES:
 :CUSTOM_ID: h:pdf-handling-options
@@ -146,6 +160,7 @@ If neither a file nor a URL is set, the current buffer content is used as the so
 - =l= (*Language*) --- set the output language.  When unset, cards are generated in the same language as the source.  Defaults to ~anki-noter-language~.
 - =o= (*Topic focus*) --- narrow generation to a specific topic within the source material.  When unset, the LLM considers the full content.
 - =s= (*Cite sources*) --- toggle whether to append a source citation to each card back.  Defaults to ~anki-noter-cite-sources~.
+- =-m= (*AI model*) --- set the =gptel= model for this session.  Displays the current value of ~anki-noter-model~; when unset, the global ~gptel-model~ is used.  See [[#h:ai-model-options][AI model]].
 
 *** Actions
 
