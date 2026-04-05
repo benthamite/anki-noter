@@ -15,20 +15,25 @@ You provide source material (org files, markdown, text, PDFs, or web pages) and 
 
 ## Installation
 
-### With elpaca or straight.el
+### package-vc (built-in since Emacs 30)
 
-```elisp
+```emacs-lisp
 (use-package anki-noter
-  :elpaca (:host github :repo "benthamite/anki-noter"))
+  :vc (:url "https://github.com/benthamite/anki-noter"))
 ```
 
-### Manual
+### Elpaca
 
-Clone the repository and add it to your `load-path`:
+```emacs-lisp
+(use-package anki-noter
+  :ensure (:host github :repo "benthamite/anki-noter"))
+```
 
-```elisp
-(add-to-list 'load-path "/path/to/anki-noter")
-(require 'anki-noter)
+### straight.el
+
+```emacs-lisp
+(use-package anki-noter
+  :straight (:host github :repo "benthamite/anki-noter"))
 ```
 
 ## Input sources
