@@ -164,3 +164,7 @@ anki-noter uses gptel as the LLM transport layer. Your configured gptel backend 
 - If anki-editor is not available (for push), a warning is shown but card generation still works.
 - If PDF native input fails (unsupported backend), the fallback command is tried. If that also fails, an error with instructions to install `pdftotext` is signaled.
 - If URL fetching fails, an error with the HTTP status is signaled.
+
+## Documentation
+
+For a comprehensive description of all user options, commands, and functions, see the [manual](https://stafforini.com/notes/anki-noter/).
