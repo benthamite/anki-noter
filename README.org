@@ -34,6 +34,8 @@ The single entry point is the =M-x anki-noter= command, which opens a transient 
 
 The package requires Emacs 28.1 or later, =gptel= 0.9+, and =anki-editor= 0.3+.  The =transient= library is also required, but it is bundled with Emacs 28.1 and later.
 
+The development repository is on [[https://github.com/benthamite/anki-noter][GitHub]].
+
 * User options
 :PROPERTIES:
 :CUSTOM_ID: h:user-options
