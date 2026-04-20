@@ -97,6 +97,9 @@ menu::).
 ‘anki-editor’ 0.3+.  The ‘transient’ library is also required, but it is
 bundled with Emacs 28.1 and later.
 
+   The development repository is on GitHub
+(https://github.com/benthamite/anki-noter).
+
 
 File: anki-noter.info,  Node: User options,  Next: Commands,  Prev: Overview,  Up: Top
 
@@ -213,6 +216,11 @@ the backend is inferred automatically by searching the registered
    Both options can be changed per session via the ‘-m’ key in the
 transient menu (*note The transient menu::), which sets
 ‘anki-noter-model’ for the duration of the Emacs session.
+
+   Note that ‘anki-noter’ disables ‘gptel’ tool use (‘gptel-use-tools’)
+for all LLM requests it makes, since tool calling is unnecessary for
+card generation and can interfere with the expected plain-text response
+format.
 
 
 File: anki-noter.info,  Node: PDF handling,  Next: Anki integration,  Prev: AI model,  Up: User options
@@ -483,25 +491,25 @@ File: anki-noter.info,  Node: Variable index,  Prev: Function index,  Up: Indice
 Tag Table:
 Node: Top220
 Node: Overview936
-Node: User options2706
-Node: Card generation2948
-Node: Template configuration4373
-Node: Citation6211
-Node: AI model7031
-Node: PDF handling8089
-Node: Anki integration8996
-Node: Commands9552
-Node: The transient menu9720
-Node: Source10600
-Node: Target11545
-Node: Options12278
-Node: Actions13472
-Node: Generating cards13687
-Node: Functions15411
-Node: Prompt assembly15552
-Node: Indices16732
-Node: Function index16870
-Node: Variable index17235
+Node: User options2794
+Node: Card generation3036
+Node: Template configuration4461
+Node: Citation6299
+Node: AI model7119
+Node: PDF handling8411
+Node: Anki integration9318
+Node: Commands9874
+Node: The transient menu10042
+Node: Source10922
+Node: Target11867
+Node: Options12600
+Node: Actions13794
+Node: Generating cards14009
+Node: Functions15733
+Node: Prompt assembly15874
+Node: Indices17054
+Node: Function index17192
+Node: Variable index17557
 
 End Tag Table
 
